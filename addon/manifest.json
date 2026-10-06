@@ -1,0 +1,19 @@
+{
+  "manifest_version": 2,
+  "name": "Zotero 墨墨单词同步",
+  "version": "0.1.0",
+  "description": "从 Zotero 阅读器加入单词到墨墨云词本「Zotero 背诵」和学习计划。",
+  "author": "Zotero 墨墨单词同步贡献者",
+  "icons": {
+    "48": "content/icon.svg",
+    "96": "content/icon.svg"
+  },
+  "applications": {
+    "zotero": {
+      "id": "wordsync-maimemo@lokan.local",
+      "update_url": "https://www.zotero.org/download/plugins/zotero-wordsync-maimemo/updates.json",
+      "strict_min_version": "6.999",
+      "strict_max_version": "10.*"
+    }
+  }
+}

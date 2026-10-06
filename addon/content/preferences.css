@@ -1,0 +1,14 @@
+.wordsync-settings { max-width: 660px; padding: 0 8px 16px; line-height: 1.6; }
+.wordsync-settings p { margin: 10px 0; }
+.wordsync-settings h2 { margin: 24px 0 8px; font-size: 1.15em; }
+.wordsync-settings .wordsync-field { display: flex; flex-direction: column; gap: 6px; margin: 18px 0 8px; }
+.wordsync-settings input[type="password"] { padding: 8px 10px; font: inherit; }
+.wordsync-settings .wordsync-checkbox { display: flex; gap: 8px; align-items: center; }
+.wordsync-settings .wordsync-buttons { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+.wordsync-settings button { padding: 6px 12px; font: inherit; cursor: pointer; }
+.wordsync-settings button:disabled { cursor: default; opacity: .6; }
+.wordsync-settings .wordsync-secondary { color: var(--fill-secondary, #666); font-size: .95em; }
+.wordsync-settings .wordsync-message { min-height: 26px; }
+.wordsync-settings .wordsync-records { max-height: 350px; overflow: auto; padding-left: 22px; }
+.wordsync-settings .wordsync-records li { margin: 8px 0; overflow-wrap: anywhere; }
+.wordsync-settings .wordsync-record-error { font-size: .9em; color: var(--fill-secondary, #666); }

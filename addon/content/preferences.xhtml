@@ -1,0 +1,32 @@
+<groupbox xmlns="http://www.mozilla.org/keymaster/gatekeeper/there.is.only.xul"
+          xmlns:html="http://www.w3.org/1999/xhtml"
+          id="wordsync-maimemo-preferences"
+          onload="event.waitUntil(Zotero.WordSyncMaimemo.mountPreferences(this))">
+  <html:section class="wordsync-settings main-section">
+    <html:p>在阅读器中划选单词，确认后加入墨墨背单词。</html:p>
+    <html:p>所有单词统一加入云词本「Zotero 背诵」。请先在墨墨 App 中创建或保留这个词本。</html:p>
+    <html:label class="wordsync-field">
+      墨墨开放 API Token
+      <html:input data-wordsync="token" type="password" autocomplete="off" spellcheck="false" />
+    </html:label>
+    <html:p class="wordsync-secondary" data-wordsync="token-state" />
+    <html:p class="wordsync-secondary">获取方式：墨墨 App → 我的 → 更多设置 → 实验功能 → 开放 API。</html:p>
+    <html:label class="wordsync-checkbox">
+      <html:input data-wordsync="study-plan" type="checkbox" />
+      自动加入墨墨学习计划
+    </html:label>
+    <html:p class="wordsync-secondary">开关适用于之后加入的单词。学习计划联动需要在墨墨 App 中开启自动同步。</html:p>
+    <html:div class="wordsync-buttons">
+      <html:button data-wordsync="save" type="button">保存设置</html:button>
+      <html:button data-wordsync="test" type="button">测试连接</html:button>
+      <html:button data-wordsync="clear" type="button">清除 Token</html:button>
+    </html:div>
+    <html:p class="wordsync-message" data-wordsync="message" role="status" aria-live="polite" />
+    <html:h2>同步状态</html:h2>
+    <html:p data-wordsync="worker-status" role="status" aria-live="polite" />
+    <html:p data-wordsync="counts" />
+    <html:button data-wordsync="retry" type="button">重试未完成的单词</html:button>
+    <html:p class="wordsync-secondary">以下显示最近 50 条加入记录。</html:p>
+    <html:ul data-wordsync="records" class="wordsync-records" />
+  </html:section>
+</groupbox>

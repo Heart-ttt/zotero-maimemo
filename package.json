@@ -1,0 +1,20 @@
+{
+  "name": "zotero-wordsync-maimemo",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Zotero 与墨墨背单词的单词加入与同步核心。",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "test": "node --test",
+    "test:watch": "node --test --watch"
+  },
+  "engines": {
+    "node": ">=22.13.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2",
+    "fflate": "^0.8.3",
+    "jsdom": "^30.1.2"
+  }
+}

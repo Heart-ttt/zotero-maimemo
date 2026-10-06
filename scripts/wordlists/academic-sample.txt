@@ -1,0 +1,114 @@
+# 说明（以 # 开头的行是分组名，// 开头是注释，空行忽略）
+// 这是一份手工抽样的词表，不是 AWL、COCA 或任何标准词表的完整版本。
+// 它只用来快速摸清墨墨词库的收录边界；真要下结论，请用自己 Zotero 库里
+// 实际取到的生词跑一遍：verify-maimemo.sh coverage --words-file <你的词表>
+// 各组的作用见 docs/2026-09-21-survey.md 与本文件内的分组注释。
+
+# control-common
+// 对照组：这组必须接近 100%。低了说明是查询方式有问题，不是词库收录问题。
+apple
+water
+because
+result
+science
+increase
+however
+student
+market
+language
+
+# core-academic
+// 通用学术词，论文里跨学科高频出现。
+analyze
+approximate
+arbitrary
+coherent
+constitute
+constrain
+converge
+denote
+derive
+empirical
+hypothesis
+implicit
+inherent
+infer
+magnitude
+mitigate
+negligible
+paradigm
+plausible
+preliminary
+subsequent
+sufficient
+threshold
+underlying
+validate
+
+# discipline-jargon
+// 学科术语：机器学习、统计、生物医学、物理化学各抓一些。
+ablation
+baseline
+covariate
+eigenvalue
+entropy
+heuristic
+heteroscedasticity
+hyperparameter
+overfitting
+perturbation
+regularization
+stochastic
+corpus
+lemmatization
+tokenization
+assay
+cytotoxic
+in-silico
+pathogenesis
+phenotype
+catalysis
+enthalpy
+isotope
+stoichiometry
+viscosity
+
+# rare-latinate
+// 生僻但学术写作里常见的词，最可能没被词库收录。
+obviate
+ostensible
+extant
+salient
+tautological
+epistemic
+ontological
+orthogonal
+canonical
+axiomatic
+teleological
+heteronomous
+attenuate
+elucidate
+delineate
+
+# inflected
+// 形态变体：检验查词接口是否要求原形。
+// 若这组全军覆没，说明取词端必须自己做词形还原（hover-translate 已做过这摊活）。
+attenuated
+ablations
+orthogonality
+perturbations
+regularized
+confounding
+elucidating
+converged
+denoting
+
+# multiword
+// 连字符与多词短语：检验分词边界，预期大面积查不到。
+state-of-the-art
+in vitro
+machine learning
+per se
+a priori
+ceteris paribus
