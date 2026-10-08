@@ -10,7 +10,7 @@ const target = { id: "target", title: "Zotero 背诵", status: "PUBLISHED", brie
 
 function createRemoteHost(overrides = {}) {
   let content = target.content;
-  return createHost({ token: "fixture-token", request: async (method, url, options) => {
+  const host = createHost({ token: "fixture-token", request: async (method, url, options) => {
     if (overrides.request) return overrides.request(method, url, options);
     if (url.includes("notepads?")) return remoteResponse({ notepads: [{ id: target.id, title: target.title }] });
     if (url.endsWith("/notepads/target") && method === "GET") return remoteResponse({ notepad: { ...target, content } });
@@ -19,6 +19,9 @@ function createRemoteHost(overrides = {}) {
     if (url.endsWith("/study/add_words")) return remoteResponse({ added_count: 1 });
     throw new Error(`unexpected request: ${url}`);
   } });
+  host.prefs.set("wordsync-maimemo.notepadId", target.id);
+  host.prefs.set("wordsync-maimemo.notepadTitle", target.title);
+  return host;
 }
 
 test("官方阅读器钩子连通本地队列与墨墨两步同步，停用清理后重启恢复", async () => {

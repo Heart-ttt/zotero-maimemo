@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import {
   MaimemoNotepadGateway,
-  MaimemoNotepadResolver,
+  MaimemoNotepadDirectory,
   MaimemoStudyPlanGateway,
 } from "../../src/integrations/maimemo/maimemo-gateways.mjs";
 
@@ -99,10 +99,6 @@ test("词库未收录时不提交学习计划请求，同名词本不静默选�
   } });
   await assert.rejects(gateway.addWords({ spellings: ["unknown"] }), /词库未收录/);
   assert.equal(wrote, false);
-  const resolver = new MaimemoNotepadResolver({ client: { async listNotepads() {
-    return { notepads: [{ id: "1", title: "Zotero 背诵" }, { id: "2", title: "Zotero 背诵" }] };
-  } } });
-  await assert.rejects(resolver.resolve(), /多个同名云词本/);
 });
 
 test("study plan gateway delegates without coupling the sync service to HTTP", async () => {
@@ -123,10 +119,9 @@ test("study plan gateway delegates without coupling the sync service to HTTP", a
   assert.deepEqual(received, { ids: ["voc-mouse"], options: { advance: true } });
 });
 
-test("notepad resolver finds the single configured target across pages", async () => {
+test("词本目录翻完所有页，排除「我的收藏」", async () => {
   const requests = [];
-  const resolver = new MaimemoNotepadResolver({
-    title: "Zotero 背诵",
+  const directory = new MaimemoNotepadDirectory({
     client: {
       async listNotepads(input) {
         requests.push(input);
@@ -138,22 +133,62 @@ test("notepad resolver finds the single configured target across pages", async (
             })),
           };
         }
-        return { notepads: [{ id: "target", title: "Zotero 背诵" }] };
+        return { notepads: [
+          { id: "fav", title: "我的收藏", type: "FAVORITE" },
+          { id: "target", title: "  Zotero 背诵  " },
+        ] };
       },
     },
   });
 
-  assert.deepEqual(await resolver.resolve(), { id: "target", title: "Zotero 背诵" });
+  const notepads = await directory.list();
+
+  assert.equal(notepads.length, 11, "10 条第一页加上第二页里唯一的云词本");
+  assert.deepEqual(notepads.at(-1), { id: "target", title: "Zotero 背诵" });
+  assert.equal(notepads.some((notepad) => notepad.id === "fav"), false, "我的收藏不是云词本");
   assert.deepEqual(requests, [
     { limit: 10, offset: 0 },
     { limit: 10, offset: 10 },
   ]);
 });
 
-test("notepad resolver fails instead of silently selecting another wordbook", async () => {
-  const resolver = new MaimemoNotepadResolver({
+test("词本按 id 校验，改名不影响；删掉了给出可操作的提示", async () => {
+  const directory = new MaimemoNotepadDirectory({
+    client: { async getNotepad(id) { return id === "live" ? { notepad: { title: "改过名的词本" } } : {}; } },
+  });
+
+  assert.deepEqual(await directory.get("live"), { id: "live", title: "改过名的词本" });
+  await assert.rejects(directory.get("gone"), /重新选择/);
+  await assert.rejects(directory.get(""), /尚未选择云词本/);
+});
+
+test("新建词本按接口要求补齐必填字段，并把新 id 带回来", async () => {
+  let sent;
+  const directory = new MaimemoNotepadDirectory({
+    client: { async createNotepad(notepad) { sent = notepad; return { notepad: { id: "created" } }; } },
+  });
+
+  assert.deepEqual(await directory.create({ title: "  论文生词  " }), { id: "created", title: "论文生词" });
+  assert.deepEqual(Object.keys(sent).sort(), ["brief", "content", "status", "tags", "title"]);
+  assert.equal(sent.title, "论文生词");
+  assert.equal(sent.status, "UNPUBLISHED", "新建的词本默认不发布");
+  // 实测空 content 会被拒：400 notepad_invalid_content。
+  assert.equal(sent.content, "#Zotero", "内容不能为空，用一个章节标题占位");
+  await assert.rejects(directory.create({ title: "   " }), /请填写云词本名称/);
+});
+
+test("账号里一个云词本都没有时返回空列表，不猜一个词本出来", async () => {
+  const directory = new MaimemoNotepadDirectory({
     client: { async listNotepads() { return { notepads: [] }; } },
   });
 
-  await assert.rejects(() => resolver.resolve(), /云词本不存在/);
+  assert.deepEqual(await directory.list(), []);
+});
+
+test("墨墨返回的列表结构不对时报错，不当成空账号", async () => {
+  const directory = new MaimemoNotepadDirectory({
+    client: { async listNotepads() { return {}; } },
+  });
+
+  await assert.rejects(() => directory.list(), /未返回有效的云词本列表/);
 });

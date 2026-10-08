@@ -1,6 +1,8 @@
 const TOKEN_HOST = "chrome://zotero";
 const TOKEN_REALM = "WordSync Maimemo API";
 const STUDY_PLAN_PREF = "wordsync-maimemo.addToStudyPlan";
+const NOTEPAD_ID_PREF = "wordsync-maimemo.notepadId";
+const NOTEPAD_TITLE_PREF = "wordsync-maimemo.notepadTitle";
 
 export class ZoteroPreferences {
   constructor({ Zotero }) {
@@ -14,6 +16,18 @@ export class ZoteroPreferences {
 
   setStudyPlanEnabled(enabled) {
     this.prefs.set(STUDY_PLAN_PREF, enabled);
+  }
+
+  getNotepad() {
+    const id = this.prefs.get(NOTEPAD_ID_PREF);
+    if (typeof id !== "string" || !id) return null;
+    const title = this.prefs.get(NOTEPAD_TITLE_PREF);
+    return { id, title: typeof title === "string" && title ? title : "(未命名)" };
+  }
+
+  setNotepad(notepad) {
+    this.prefs.set(NOTEPAD_ID_PREF, notepad?.id ?? "");
+    this.prefs.set(NOTEPAD_TITLE_PREF, notepad?.title ?? "");
   }
 }
 

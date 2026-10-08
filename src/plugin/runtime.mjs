@@ -7,7 +7,7 @@ import { safeErrorMessage } from "../application/sync-error.mjs";
 import { JsonWordStore } from "../infrastructure/json-word-store.mjs";
 import { RateLimitedTransport } from "../infrastructure/rate-limited-transport.mjs";
 import { MaimemoApiClient } from "../integrations/maimemo/maimemo-api-client.mjs";
-import { MaimemoNotepadGateway, MaimemoNotepadResolver, MaimemoStudyPlanGateway } from "../integrations/maimemo/maimemo-gateways.mjs";
+import { MaimemoNotepadDirectory, MaimemoNotepadGateway, MaimemoStudyPlanGateway } from "../integrations/maimemo/maimemo-gateways.mjs";
 import { createZoteroWordFile } from "../integrations/zotero/file-adapter.mjs";
 import { ZoteroPreferences, ZoteroCredentials } from "../integrations/zotero/settings-adapters.mjs";
 import { ZoteroHttpTransport } from "../integrations/zotero/http-transport.mjs";
@@ -41,7 +41,7 @@ export class WordSyncPlugin {
     this.captureService = new WordCaptureService({ store: this.store, lemmatizer: new RuleLemmatizer() });
     this.settings = new SettingsService({
       preferences: this.preferences, credentials: this.credentials,
-      resolveNotepad: (token) => new MaimemoNotepadResolver({ client: this.createClient(token) }).resolve(),
+      createDirectory: (token) => new MaimemoNotepadDirectory({ client: this.createClient(token) }),
     });
     this.worker = new SyncWorker({ store: this.store, createSession: () => this.createSession(), timers: host.timers });
     this.readerHandler = (event) => this.renderPopup(event);
@@ -61,8 +61,11 @@ export class WordSyncPlugin {
     const generation = this.generation;
     const token = await this.credentials.getToken();
     if (!token || !this.alive) return null;
+    const selected = this.preferences.getNotepad();
+    if (!selected) throw new Error("尚未选择云词本，请在设置中选择或新建一个");
     const client = this.createClient(token);
-    const notepad = await new MaimemoNotepadResolver({ client }).resolve();
+    // 每轮同步前确认词本还在，用户可能在 App 里删了或改了名。
+    const notepad = await new MaimemoNotepadDirectory({ client }).get(selected.id);
     const syncService = new WordSyncService({
       store: this.store,
       notepadGateway: new MaimemoNotepadGateway({ client }),

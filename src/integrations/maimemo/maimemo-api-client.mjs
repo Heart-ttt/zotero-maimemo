@@ -26,6 +26,10 @@ export class MaimemoApiClient {
     return this.request("GET", "/api/v1/memo/notepads", { query: { limit, offset } });
   }
 
+  async createNotepad(notepad) {
+    return this.request("POST", "/api/v1/memo/notepads", { body: { notepad } });
+  }
+
   async getNotepad(notepadId) {
     return this.request("GET", `/api/v1/memo/notepads/${encodeURIComponent(notepadId)}`);
   }

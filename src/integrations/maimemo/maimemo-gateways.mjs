@@ -1,5 +1,8 @@
 export const DEFAULT_MAIMEMO_NOTEPAD_TITLE = "Zotero 背诵";
 
+// 新建词本的初始内容。墨墨不接受空内容，这是最小的合法写法。
+const INITIAL_NOTEPAD_CONTENT = "#Zotero";
+
 export class MaimemoNotepadGateway {
   constructor({ client }) {
     this.client = client;
@@ -12,10 +15,10 @@ export class MaimemoNotepadGateway {
       throw new Error("墨墨未返回完整的云词本内容，已停止写入以保留原数据");
     }
     const content = notepad.content;
-    if (notepad.title?.trim() !== DEFAULT_MAIMEMO_NOTEPAD_TITLE
-      || typeof notepad.brief !== "string" || !Array.isArray(notepad.tags)
-      || typeof notepad.status !== "string") {
-      throw new Error("云词本信息不完整或名称已变化，请检查「Zotero 背诵」词本");
+    // 词本按 id 认，改名不影响同步；但缺字段时不能写回，否则会把远端字段清空。
+    if (typeof notepad.title !== "string" || typeof notepad.brief !== "string"
+      || !Array.isArray(notepad.tags) || typeof notepad.status !== "string") {
+      throw new Error("墨墨返回的云词本信息不完整，已停止写入以保留原数据");
     }
     const lines = content.split(/\r?\n/).map((line) => line.trim());
     const exists = lines.some((line) => line !== "//" && line.toLocaleLowerCase("en-US") === lemma);
@@ -37,13 +40,13 @@ export class MaimemoNotepadGateway {
   }
 }
 
-export class MaimemoNotepadResolver {
-  constructor({ client, title = DEFAULT_MAIMEMO_NOTEPAD_TITLE }) {
+export class MaimemoNotepadDirectory {
+  constructor({ client }) {
     this.client = client;
-    this.title = title;
   }
 
-  async resolve() {
+  /** 列出账号里的云词本，翻完所有页。「我的收藏」不是云词本，排除掉。 */
+  async list() {
     const notepads = [];
     let offset = 0;
     const limit = 10;
@@ -57,14 +60,32 @@ export class MaimemoNotepadResolver {
       offset += limit;
     }
 
-    const matches = notepads.filter((notepad) => notepad.title?.trim() === this.title);
-    if (matches.length > 1) throw new Error(`存在多个同名云词本：${this.title}；请保留一个目标词本`);
-    const match = matches[0];
-    if (!match) {
-      throw new Error(`墨墨云词本不存在：${this.title}`);
-    }
-    if (typeof match.id !== "string" || !match.id) throw new Error("目标云词本 ID 无效");
-    return { id: match.id, title: match.title };
+    return notepads
+      .filter((notepad) => notepad.type !== "FAVORITE" && typeof notepad.id === "string" && notepad.id)
+      .map((notepad) => ({ id: notepad.id, title: String(notepad.title ?? "").trim() || "(未命名)" }));
+  }
+
+  /** 校验已选词本还在，顺带把最新标题带回来（用户可能在 App 里改过名）。 */
+  async get(notepadId) {
+    if (typeof notepadId !== "string" || !notepadId) throw new Error("尚未选择云词本");
+    const data = await this.client.getNotepad(notepadId);
+    const notepad = data?.notepad;
+    if (!notepad) throw new Error("选定的云词本已不存在，请在设置中重新选择");
+    return { id: notepadId, title: String(notepad.title ?? "").trim() || "(未命名)" };
+  }
+
+  async create({ title, brief = "由 Zotero 单词同步插件创建", tags = ["其他"] }) {
+    const name = String(title ?? "").trim();
+    if (!name) throw new Error("请填写云词本名称");
+    // 创建接口要求 status/content/title/brief/tags 全部给出，而且 content 不能为空：
+    // 实测空串返回 400 notepad_invalid_content「云词库不存在」。一个章节标题是
+    // 最小的合法内容，建出来的词本不含任何单词。
+    const data = await this.client.createNotepad({
+      title: name, brief, tags, content: INITIAL_NOTEPAD_CONTENT, status: "UNPUBLISHED",
+    });
+    const id = data?.notepad?.id;
+    if (typeof id !== "string" || !id) throw new Error("墨墨未返回新建云词本的 ID，请刷新列表确认");
+    return { id, title: name };
   }
 }
 

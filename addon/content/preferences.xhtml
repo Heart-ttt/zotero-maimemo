@@ -4,13 +4,28 @@
           onload="event.waitUntil(Zotero.WordSyncMaimemo.mountPreferences(this))">
   <html:section class="wordsync-settings main-section">
     <html:p>在阅读器中划选单词，确认后加入墨墨背单词。</html:p>
-    <html:p>所有单词统一加入云词本「Zotero 背诵」。请先在墨墨 App 中创建或保留这个词本。</html:p>
+    <html:p>单词会加入你在下面选定的云词本，可以直接在这里新建一个。</html:p>
     <html:label class="wordsync-field">
       墨墨开放 API Token
       <html:input data-wordsync="token" type="password" autocomplete="off" spellcheck="false" />
     </html:label>
     <html:p class="wordsync-secondary" data-wordsync="token-state" />
     <html:p class="wordsync-secondary">获取方式：墨墨 App → 我的 → 更多设置 → 实验功能 → 开放 API。</html:p>
+    <html:h2>云词本</html:h2>
+    <html:p class="wordsync-secondary" data-wordsync="notepad-state" />
+    <html:div class="wordsync-buttons">
+      <html:select data-wordsync="notepad-list" />
+      <html:button data-wordsync="notepad-refresh" type="button">查询云词本</html:button>
+      <html:button data-wordsync="notepad-select" type="button">使用所选</html:button>
+    </html:div>
+    <html:label class="wordsync-field">
+      新建云词本
+      <html:input data-wordsync="notepad-new-title" type="text" spellcheck="false" />
+    </html:label>
+    <html:div class="wordsync-buttons">
+      <html:button data-wordsync="notepad-create" type="button">新建并使用</html:button>
+    </html:div>
+    <html:p class="wordsync-secondary">新建的词本默认不发布，只有你自己看得到。</html:p>
     <html:label class="wordsync-checkbox">
       <html:input data-wordsync="study-plan" type="checkbox" />
       自动加入墨墨学习计划
