@@ -1,4 +1,4 @@
-import { IdentityLemmatizer } from "../domain/lemmatizer.mjs";
+import { RuleLemmatizer } from "../domain/lemmatizer.mjs";
 import { WordCaptureService } from "../application/word-capture-service.mjs";
 import { WordSyncService } from "../application/word-sync-service.mjs";
 import { SyncWorker } from "../application/sync-worker.mjs";
@@ -38,7 +38,7 @@ export class WordSyncPlugin {
     this.transport = new RateLimitedTransport({
       ...transportOptions, fetchImpl: this.http.fetch, timers: host.timers,
     });
-    this.captureService = new WordCaptureService({ store: this.store, lemmatizer: new IdentityLemmatizer() });
+    this.captureService = new WordCaptureService({ store: this.store, lemmatizer: new RuleLemmatizer() });
     this.settings = new SettingsService({
       preferences: this.preferences, credentials: this.credentials,
       resolveNotepad: (token) => new MaimemoNotepadResolver({ client: this.createClient(token) }).resolve(),
