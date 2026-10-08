@@ -1,55 +1,49 @@
 # zotero-wordsync-maimemo
 
-在 Zotero 阅读器中划选生词，确认后点「加入」，后台把单词加入墨墨云词本「Zotero 背诵」。自动加入学习计划默认开启，可在设置中关闭。
+在 Zotero 阅读器里划词，把词加进墨墨的云词本和学习计划。不用先建注释，划中点一下就进队列。
 
-只做 Zotero 与墨墨背单词的联动。只保存所选单词及同步进度，不保存或生成例句，不提供整句翻译或在背词提示。
+## 现状
 
-## 安装与使用
+0.1.0 可安装。`npm run build` 出 `dist/zotero-wordsync-maimemo-0.1.0.xpi`。
 
-当前安装包声明支持 Zotero 7.x–10.x，开发时核对的宿主版本是 10.0.5；阅读器弹窗接口按 Zotero 10 实现。
+做了这些：
 
-1. 使用 `dist/zotero-wordsync-maimemo-0.1.0.xpi`。在 Zotero「工具 → 插件」中点击齿轮，选择「从文件安装插件」，选中这个文件。
-2. 打开 Zotero 设置，选择「墨墨单词同步」，填写墨墨开放 API Token。Token 从墨墨 App「我的 → 更多设置 → 实验功能 → 开放 API」获取。
-3. 确保账号只有一个名为「Zotero 背诵」的目标云词本。点击「测试连接」只读取词本列表；点击「保存设置」保存 Token 和学习计划开关。需要学习计划联动时，在墨墨 App 中开启自动同步。
-4. 在阅读器中双击或拖选文字。单词较多时先点其中一个；确认或修改「单词原形」，再点「加入」。弹窗沿用原生关闭方式，显示保存结果。
-5. 在设置页查看最近 50 条记录和后台状态，必要时点击「重试未完成的单词」。
+- 阅读器划词后，在 Zotero 原生的选中弹窗里多出一块。选区有多个词时列出来让你点一个
+- 自动还原成原形（`ablations` → `ablation`，`taught` → `teach`），结果可以当场改
+- 点「加入」才写入，只写本地队列；不点就什么都不留
+- 后台按墨墨的频控限速同步：把词追加进你选定的云词本，再加进学习计划
+- 认证失效会暂停队列并提示重填 Token，不在阅读中途打断
+- 设置页填 Token、查询账号里的云词本并选一个、直接新建词本、开关「加入学习计划」、测试连接（只读）
 
-未配置 Token 或断网时仍可加入本地队列。记录保存到 Zotero 数据目录的 `wordsync-maimemo.json`，重启后恢复。Token 单独存于 Zotero 凭据管理器，不会以明文写入普通 prefs、项目文件或安装包。已有 Token 不回填到输入框，留空保存表示保留当前 Token。
+没做例句、没做文献出处、没做按分类分词本。只同步单词本身。
 
-学习计划开关只影响之后加入的单词。云词本与学习计划分步记录结果，部分成功时重试只补未完成步骤。认证失效会暂停队列；保存 Token 或手动重试后恢复，不弹出阅读中断提示。
+## 使用前提
 
-## 完成情况
+Token 走 App 内「我的 → 更多设置 → 实验功能 → 开放 API」，填进插件设置页。
 
-已实现官方阅读器弹窗扩展、设置页、可编辑原形、单词去重、本地原子保存、串行后台同步、临时错误重试、认证暂停及插件构建。同步请求保留词本原内容，并按当前官方接口先查询单词 ID 再加入学习计划。
+然后在设置页点「查询云词本」选一个，或者填个名字点「新建并使用」。没选词本之前同步不会开始，设置页会直说。词本认的是 id，你之后在 App 里改名不影响同步。
 
-自动词形还原、词义查询、移除或清空队列、同步后撤销尚未实现。当前弹窗以原文词作为初始原形，需人工确认；例如把 `mice` 改成 `mouse`。这次完成的是阅读器与设置接入，不代表完整 V1 已完成。
+## 为什么不直接用现成的
 
-离线测试和本机 Zotero 10.0.5 原生验证已通过：插件可安装启用，双击或拖选正文会显示加入区，设置页能正常加载，点击加入会写入本地队列。此次验证未向墨墨账号执行写入；当前官方接口采用 `/open/api/v1/memo/*` 路径，历史只读实测使用的是旧路径，需要后续核对服务端与 App 中的真实同步结果。
+Zotero 侧已有两个插件做「生词进墨墨」：
 
-## 开发与测试
+- [zotero-hover-translate-eudic](https://github.com/SHANGKAIJIE/zotero-hover-translate-eudic)（12 star）：PDF 里划词翻译，弹窗点 `+` 加入云词本，墨墨 / 欧路 / 扇贝等五平台可选
+- [zotero-maimemo-sync](https://github.com/bulletproof-system/zotero-maimemo-sync)（5 star）：批量把 Zotero 注释推成云词本，无 release
 
-开发环境要求 Node.js 22.13 或更新版本。Zotero 用户安装 XPI 不需要 Node.js。
+区别在两处。一是操作：它们要你先在 Zotero 里建注释，再去侧栏选词本，再选追加还是覆盖；这里是划词点一下，词本在设置里选一次就固定，永远增量追加且不重复写。二是落点：它们只把词写进云词本，词躺在本子里不会自己进复习；这里用 `study/add_words` 直接送进学习计划。
 
-```bash
-npm ci
-npm test
-npm run build
-```
-
-测试涵盖弹窗未点击不保存、手工修改原形、异步换词、重复点击、凭据隔离、重启恢复、部分成功重试、认证暂停、限流及打包后的生命周期加载。构建使用 esbuild，安装包只包含 `addon` 的静态资源和打包后的运行代码，不包含开发工具或测试数据。
-
-版本以 `package.json` 为准；安装包 `0.1.0` 对应 Git tag `v0.1.0`。构建时设置 `RELEASE_TAG=v0.1.0` 会校验两者一致。
-
-墨墨只读集成测试默认跳过。需要验证认证和目标词本时，通过环境变量临时提供 Token：
+## 开发
 
 ```bash
-RUN_MAIMEMO_LIVE=1 MAIMEMO_TOKEN="<token>" npm test -- --test-name-pattern="墨墨 live"
+npm test        # node --test，50 个用例
+npm run build   # 打 xpi
 ```
 
-## 项目文档
+`tests/integrations/maimemo-live.test.mjs` 会打真实接口，默认跳过，要跑得同时给 `RUN_MAIMEMO_LIVE=1` 和 `MAIMEMO_TOKEN`。
 
-- [当前功能范围](docs/SCOPE.md)
-- [架构、模块职责与接口依据](docs/ARCHITECTURE.md)
-- [当前进度与后续验证](docs/HANDOFF.md)
-- [历史 API 实测](docs/2026-09-21-api-probe.md)
-- [竞品功能对比](docs/2026-09-21-survey.md)
+## 文档
+
+- 范围与已知限制 → [docs/SCOPE.md](docs/SCOPE.md)
+- 进度与待办 → [docs/HANDOFF.md](docs/HANDOFF.md)
+- 墨墨 API 实测 → [docs/2026-09-21-api-probe.md](docs/2026-09-21-api-probe.md)
+- 竞品调研 → [docs/2026-09-21-survey.md](docs/2026-09-21-survey.md)
