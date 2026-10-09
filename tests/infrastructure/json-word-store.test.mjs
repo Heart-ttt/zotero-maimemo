@@ -49,3 +49,76 @@ test("损坏文件不覆盖，写入失败不提交内存，后续仍可重试",
   await store.insert(record);
   assert.equal((await store.listAll()).length, 1);
 });
+
+function fakeFile(initial = null) {
+  const state = { content: initial, appends: 0, rewrites: 0 };
+  return {
+    state,
+    async read() { return state.content; },
+    async writeAtomic(text) { state.rewrites += 1; state.content = text; },
+    async append(text) { state.appends += 1; state.content = (state.content ?? "") + text; },
+  };
+}
+
+test("改一条只追加一行，不重写整个文件；行数积多了才整理一次", async () => {
+  const file = fakeFile();
+  const store = new JsonWordStore({ file });
+  const record = createWordRecord({ lemma: "mouse", surface: "mice" });
+  await store.insert(record);
+  const afterInsert = { ...file.state };
+
+  for (let round = 0; round < 10; round += 1) {
+    await store.update({ ...record, status: "partial", inNotepad: true, notepadId: `n${round}` });
+  }
+
+  assert.equal(file.state.appends, afterInsert.appends + 10, "每次改动一次追加");
+  assert.equal(file.state.rewrites, afterInsert.rewrites, "期间不重写整个文件");
+  assert.equal(file.state.content.trim().split("\n").length, 11, "文件里躺着 11 行");
+
+  // 重放后只认最后一条，状态是最新的。
+  const restored = new JsonWordStore({ file });
+  assert.equal((await restored.listAll()).length, 1);
+  assert.equal((await restored.get(record.id)).notepadId, "n9");
+
+  // 行数积到阈值就整理一次，文件不会跟着写入次数一直涨。
+  for (let round = 0; round < 60; round += 1) {
+    await store.update({ ...record, status: "partial", inNotepad: true, notepadId: `m${round}` });
+  }
+  assert.equal(file.state.rewrites, afterInsert.rewrites + 1, "71 次写入只整理了一次");
+  const lines = file.state.content.trim().split("\n").length;
+  assert.ok(lines < 30, `文件保持在 ${lines} 行，没有跟着 71 次写入一起涨`);
+
+  const compacted = new JsonWordStore({ file });
+  assert.equal((await compacted.get(record.id)).notepadId, "m59", "整理前后读到的都是最新状态");
+});
+
+test("崩溃时写了一半的末行丢掉，整个文件坏掉则报错不覆盖", async () => {
+  const file = fakeFile();
+  const store = new JsonWordStore({ file });
+  const record = createWordRecord({ lemma: "mouse", surface: "mice" });
+  await store.insert(record);
+
+  const truncated = fakeFile(file.state.content + '{"op":"put","rec');
+  const recovered = new JsonWordStore({ file: truncated });
+  assert.equal((await recovered.listAll()).length, 1, "前面完整的那行还在");
+
+  const garbage = fakeFile("{broken\n{alsobroken\n");
+  const broken = new JsonWordStore({ file: garbage });
+  await assert.rejects(broken.listAll(), /原文件已保留/);
+  assert.equal(garbage.state.rewrites, 0, "坏文件一个字节都不许写");
+});
+
+test("旧版整文件格式能读出来，并在下一次写入时自动转成追加格式", async () => {
+  const legacyRecord = { ...createWordRecord({ lemma: "mouse", surface: "mice" }), notepadId: "old" };
+  const file = fakeFile(JSON.stringify({ version: 1, records: [legacyRecord] }, null, 2));
+  const store = new JsonWordStore({ file });
+
+  assert.equal((await store.get(legacyRecord.id)).notepadId, "old", "旧记录要读得出来");
+
+  await store.update({ ...legacyRecord, status: "synced" });
+  assert.equal(file.state.rewrites, 1, "第一次写入顺手整理成新格式");
+  assert.equal(JSON.parse(file.state.content.trim()).op, "put");
+
+  const restored = new JsonWordStore({ file });
+  assert.equal((await restored.get(legacyRecord.id)).status, "synced");
+});
