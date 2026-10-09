@@ -111,7 +111,9 @@ export class MaimemoStudyPlanGateway {
       throw new Error("墨墨未确认学习计划加入结果，请重试核对");
     }
     const study = await this.client.queryStudyRecords(ids);
-    if (!Array.isArray(study?.records) || ids.some((id) => !study.records.some((record) => record.voc_id === id))) {
+    const confirmed = Array.isArray(study?.records)
+      && ids.every((id) => study.records.some((record) => record.voc_id === id));
+    if (!confirmed) {
       throw new Error("墨墨未确认单词进入学习计划，请检查 App 自动同步与单词上限后重试");
     }
     return result;

@@ -33,7 +33,13 @@ test("Token 明文回填、改动即存、连接测试只读且结果染色", as
   });
   await settings.selectNotepad({ id: "target", title: "Zotero 背诵" });
   let retries = 0;
-  const worker = { subscribe(fn) { fn({ message: "等待加入单词" }); return () => {}; }, async retry() { retries++; } };
+  const worker = {
+    subscribe(listener) {
+      listener({ message: "等待加入单词" });
+      return () => {};
+    },
+    async retry() { retries += 1; },
+  };
   const changes = [];
   const page = new SettingsPage({
     root: dom.window.document.documentElement, settings, store: new InMemoryWordStore(), worker,

@@ -64,7 +64,9 @@ export function createHost({ token = null, request } = {}) {
       Prefs: { get: (key) => prefs.get(key), set: (key, value) => prefs.set(key, value) },
       HTTP: { async request(method, url, options) {
         calls.push({ method, url, options });
-        return request ? request(method, url, options) : { status: 200, responseText: JSON.stringify({ success: true, data: { notepads: [] } }) };
+        if (request) return request(method, url, options);
+        const empty = { success: true, data: { notepads: [] } };
+        return { status: 200, responseText: JSON.stringify(empty) };
       } },
       Reader: {
         registerEventListener(type, handler, pluginID) {

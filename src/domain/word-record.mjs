@@ -23,7 +23,7 @@ export function normalizeSurface(value) {
   }
 
   const normalized = value.normalize("NFKC").trim();
-  if (!/^[\p{L}]+(?:['’\-][\p{L}]+)*$/u.test(normalized)) {
+  if (!/^[\p{L}]+(?:['’-][\p{L}]+)*$/u.test(normalized)) {
     throw new Error("surface must be one word");
   }
   return normalized;

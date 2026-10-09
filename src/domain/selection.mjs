@@ -1,4 +1,4 @@
-const WORD_TOKEN_PATTERN = /[\p{L}]+(?:['’\-][\p{L}]+)*/gu;
+const WORD_TOKEN_PATTERN = /[\p{L}]+(?:['’-][\p{L}]+)*/gu;
 
 export function extractWordCandidates(selectionText) {
   if (typeof selectionText !== "string") {

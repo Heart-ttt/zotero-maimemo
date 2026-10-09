@@ -52,8 +52,12 @@ export class JsonWordStore {
     if (!text) return { records: new Map(), lines: 0, legacy: false };
 
     // 旧格式整个文件是一个 JSON 对象，读进来后下一次写入会自动整理成新格式。
-    let whole;
-    try { whole = JSON.parse(text); } catch { whole = null; }
+    let whole = null;
+    try {
+      whole = JSON.parse(text);
+    } catch {
+      // 不是单个 JSON 对象，那就按一行一条记录的新格式读。
+    }
     if (whole && whole.version === 1 && Array.isArray(whole.records)) {
       const records = new Map();
       for (const record of whole.records) {

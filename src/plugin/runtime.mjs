@@ -43,7 +43,11 @@ export class WordSyncPlugin {
       preferences: this.preferences, credentials: this.credentials,
       createDirectory: (token) => new MaimemoNotepadDirectory({ client: this.createClient(token) }),
     });
-    this.worker = new SyncWorker({ store: this.store, createSession: () => this.createSession(), timers: host.timers });
+    this.worker = new SyncWorker({
+      store: this.store,
+      createSession: () => this.createSession(),
+      timers: host.timers,
+    });
     this.readerHandler = (event) => this.renderPopup(event);
   }
 
@@ -77,7 +81,11 @@ export class WordSyncPlugin {
 
   async start() {
     if (this.alive || this.closed) return;
-    await Promise.all([this.Zotero.initializationPromise, this.Zotero.unlockPromise, this.Zotero.uiReadyPromise]);
+    await Promise.all([
+      this.Zotero.initializationPromise,
+      this.Zotero.unlockPromise,
+      this.Zotero.uiReadyPromise,
+    ]);
     if (this.closed) return;
     this.alive = true;
     this.Zotero.WordSyncMaimemo = this;
@@ -137,12 +145,18 @@ export class WordSyncPlugin {
     } catch (error) {
       // 设置面板的 onload 吞掉异常就只剩白屏，这里兜住：日志留全栈，界面留一句话。
       this.settingsPages.delete(view);
-      try { this.Zotero.debug(`墨墨单词同步：设置页加载失败\n${error?.stack || error?.message || error}`); } catch {}
+      try {
+        this.Zotero.debug(`墨墨单词同步：设置页加载失败\n${error?.stack || error?.message || error}`);
+      } catch {
+        // 日志写不进去也不能再抛，否则这里的兜底本身又成了错误源。
+      }
       try {
         const notice = root.ownerDocument.createElementNS("http://www.w3.org/1999/xhtml", "p");
         notice.textContent = `设置页加载失败：${safeErrorMessage(error)}`;
         root.append(notice);
-      } catch {}
+      } catch {
+        // 连这句提示都插不进去，就只剩日志了。
+      }
     }
   }
 

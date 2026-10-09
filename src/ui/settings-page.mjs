@@ -30,7 +30,20 @@ export class SettingsPage {
     this.listeners.push(() => element.removeEventListener(type, callback));
   }
 
+  /**
+   * 挂载设置页。按界面上的分区分别接线，mount 本身只负责串起顺序。
+   */
   async mount() {
+    this.cacheElements();
+    this.bindTokenSection();
+    this.bindNotepadSection();
+    this.bindOptionsSection();
+    this.bindSyncSection();
+    this.bindLifecycle();
+    await this.loadInitialState();
+  }
+
+  cacheElements() {
     this.token = this.require("token");
     this.studyPlan = this.require("study-plan");
     this.message = this.require("message");
@@ -41,41 +54,19 @@ export class SettingsPage {
     this.testResult = this.require("test-result");
     this.controls = [...this.root.querySelectorAll("button, input, select")];
     this.notepadTitle.placeholder = DEFAULT_MAIMEMO_NOTEPAD_TITLE;
-    this.listen(this.notepadList, "change", () => void this.markChosen());
-    this.listen(this.require("notepad-select"), "click", () => void this.perform(async () => {
-      const option = this.notepadList.selectedOptions?.[0];
-      if (!option?.value) throw new Error("请先查询并选择一个云词本");
-      await this.onConfigurationChange(
-        () => this.settings.selectNotepad({ id: option.value, title: option.textContent }),
-        { resume: true },
-      );
-      await this.populateSettings();
-      await this.markChosen();
-      this.message.textContent = `已改用云词本「${option.textContent}」`;
-    }));
-    this.listen(this.require("notepad-create"), "click", () => void this.perform(async () => {
-      const title = this.notepadTitle.value.trim() || DEFAULT_MAIMEMO_NOTEPAD_TITLE;
-      const notepad = await this.settings.createNotepad({ title }, this.token.value);
-      if (!this.alive) return;
-      this.notepadTitle.value = "";
-      // 只是建好了，还没开始用。刷新列表并把它选上，点一次「使用所选词本」才换。
-      await this.loadNotepads();
-      if (!this.alive) return;
-      this.notepadList.value = notepad.id;
-      await this.markChosen();
-      this.message.textContent = `已新建云词本「${notepad.title}」，点「使用所选词本」开始用它`;
-    }));
+  }
+
+  bindTokenSection() {
     // 没有「保存设置」按钮，改完就存。Token 用 change 而不是 input，
     // 免得每敲一个字符都去写一次凭据库。
     this.listen(this.token, "change", () => void this.perform(async () => {
       await this.saveSettings();
       this.message.textContent = this.token.value.trim() ? "Token 已保存" : "Token 未改动";
     }, { lock: false }));
+
+    // Token 一改，上一次的测试结果就过期了，别让它留在那里误导。
     this.listen(this.token, "input", () => this.setTestResult(null));
-    this.listen(this.studyPlan, "change", () => void this.perform(async () => {
-      await this.saveSettings();
-      this.message.textContent = this.studyPlan.checked ? "已开启自动加入学习计划" : "已关闭自动加入学习计划";
-    }, { lock: false }));
+
     this.listen(this.testButton, "click", () => void this.perform(async () => {
       this.message.textContent = "";
       let notepads;
@@ -89,6 +80,7 @@ export class SettingsPage {
       // 测试连接返回的就是列表，直接用，不再多发一次请求。
       await this.loadNotepads(notepads);
     }));
+
     this.listen(this.require("clear"), "click", () => void this.perform(async () => {
       await this.onConfigurationChange(() => this.settings.clearToken(), { resume: false });
       this.token.value = "";
@@ -96,19 +88,68 @@ export class SettingsPage {
       await this.populateSettings();
       this.message.textContent = "Token 已清除，同步已暂停；本地单词记录已保留";
     }));
+  }
+
+  bindNotepadSection() {
+    // 在列表里改选别的，绿色标记要立刻撤掉：那个还没生效。
+    this.listen(this.notepadList, "change", () => void this.markChosen());
+
+    this.listen(this.require("notepad-select"), "click", () => void this.perform(async () => {
+      const option = this.notepadList.selectedOptions?.[0];
+      if (!option?.value) throw new Error("请先选择一个云词本");
+      await this.onConfigurationChange(
+        () => this.settings.selectNotepad({ id: option.value, title: option.textContent }),
+        { resume: true },
+      );
+      await this.populateSettings();
+      await this.markChosen();
+      this.message.textContent = `已改用云词本「${option.textContent}」`;
+    }));
+
+    this.listen(this.require("notepad-create"), "click", () => void this.perform(async () => {
+      const title = this.notepadTitle.value.trim() || DEFAULT_MAIMEMO_NOTEPAD_TITLE;
+      const notepad = await this.settings.createNotepad({ title }, this.token.value);
+      if (!this.alive) return;
+      this.notepadTitle.value = "";
+      // 只是建好了，还没开始用。刷新列表并把它选上，点一次「使用所选词本」才换。
+      await this.loadNotepads();
+      if (!this.alive) return;
+      this.notepadList.value = notepad.id;
+      await this.markChosen();
+      this.message.textContent = `已新建云词本「${notepad.title}」，点「使用所选词本」开始用它`;
+    }));
+  }
+
+  bindOptionsSection() {
+    this.listen(this.studyPlan, "change", () => void this.perform(async () => {
+      await this.saveSettings();
+      this.message.textContent = this.studyPlan.checked
+        ? "已开启自动加入学习计划"
+        : "已关闭自动加入学习计划";
+    }, { lock: false }));
+  }
+
+  bindSyncSection() {
     this.listen(this.require("retry"), "click", () => void this.perform(async () => {
       await this.worker.retry();
       this.message.textContent = "已安排重试未完成的单词";
     }));
-    this.listen(this.root, "unload", () => this.dispose());
-    this.listen(this.root.ownerDocument.defaultView, "unload", () => this.dispose());
-    this.listen(this.root, "showing", () => void this.refreshRecords());
+
     this.unsubscribe = this.worker.subscribe((state) => {
       if (!this.alive) return;
       this.query("worker-status").textContent = state.message;
       void this.refreshRecords();
     });
-    await this.perform(async () => {
+  }
+
+  bindLifecycle() {
+    this.listen(this.root, "unload", () => this.dispose());
+    this.listen(this.root.ownerDocument.defaultView, "unload", () => this.dispose());
+    this.listen(this.root, "showing", () => void this.refreshRecords());
+  }
+
+  loadInitialState() {
+    return this.perform(async () => {
       await this.populateSettings();
       await this.refreshRecords();
       // 没有「查询云词本」按钮了，有 Token 就自己把列表拉下来。

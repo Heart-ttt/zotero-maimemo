@@ -17,7 +17,11 @@ function mountPopup({ text = "The mice were measured.", store = new InMemoryWord
     subscribe(listener) { listeners.add(listener); listener({ kind: "idle" }); return () => listeners.delete(listener); },
   };
   const popup = new ReaderPopup({
-    event: { doc: dom.window.document, params: { annotation: { text } }, append: (root) => dom.window.document.body.append(root) },
+    event: {
+      doc: dom.window.document,
+      params: { annotation: { text } },
+      append: (root) => dom.window.document.body.append(root),
+    },
     store, captureService: new WordCaptureService({ store, lemmatizer: new IdentityLemmatizer() }),
     settings: { async read() { return { addToStudyPlan: false }; } },
     worker, openSettings() {},

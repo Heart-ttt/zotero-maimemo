@@ -10,7 +10,11 @@ import { ManualTimers, deferred, settle } from "../helpers/fakes.mjs";
 function createWorker({ notepadGateway, studyPlanGateway, records } = {}) {
   const store = new InMemoryWordStore(records ?? [createWordRecord({ lemma: "mouse", surface: "mice" })]);
   const timers = new ManualTimers();
-  const service = new WordSyncService({ store, notepadGateway: notepadGateway ?? { async addWord() {} }, studyPlanGateway: studyPlanGateway ?? { async addWords() {} } });
+  const service = new WordSyncService({
+    store,
+    notepadGateway: notepadGateway ?? { async addWord() {} },
+    studyPlanGateway: studyPlanGateway ?? { async addWords() {} },
+  });
   const worker = new SyncWorker({ store, timers, createSession: async () => ({ notepad: { id: "target" }, syncService: service }) });
   return { worker, store, timers };
 }

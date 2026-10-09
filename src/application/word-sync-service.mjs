@@ -2,7 +2,13 @@ import { WordSyncStatus, updateWordRecord } from "../domain/word-record.mjs";
 import { classifySyncError, safeErrorMessage } from "./sync-error.mjs";
 
 export class WordSyncService {
-  constructor({ store, notepadGateway, studyPlanGateway, canSync = () => true, clock = () => new Date().toISOString() }) {
+  constructor({
+    store,
+    notepadGateway,
+    studyPlanGateway,
+    canSync = () => true,
+    clock = () => new Date().toISOString(),
+  }) {
     this.store = store;
     this.notepadGateway = notepadGateway;
     this.studyPlanGateway = studyPlanGateway;

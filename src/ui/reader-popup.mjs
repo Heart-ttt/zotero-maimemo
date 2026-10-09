@@ -4,6 +4,28 @@ import { normalizeLemma } from "../domain/word-record.mjs";
 import { safeErrorMessage } from "../application/sync-error.mjs";
 import { wordStatusText } from "./word-status.mjs";
 
+// 弹窗挂在 Zotero 原生的选中弹窗里，样式只作用于自己这一块。
+// 放在这里而不是 mount() 里，mount 才看得出它在搭什么结构。
+const POPUP_STYLE = `
+      .wordsync-maimemo-popup { border-top: 1px solid var(--fill-quinary, #ddd); padding: 7px 8px;
+        width: 248px; max-width: 100%; box-sizing: border-box; font: 12px/1.45 system-ui; color: inherit; }
+      .wordsync-maimemo-popup .wordsync-row { display: flex; align-items: center; gap: 4px;
+        flex-wrap: wrap; margin-bottom: 5px; }
+      .wordsync-maimemo-popup .wordsync-row:empty { display: none; }
+      .wordsync-maimemo-popup .wordsync-tag { color: var(--fill-secondary, #888); flex: none; }
+      .wordsync-maimemo-popup .wordsync-words { max-height: 76px; overflow: auto; }
+      .wordsync-maimemo-popup button { cursor: pointer; padding: 2px 7px; font: inherit;
+        border: 1px solid var(--fill-quaternary, #aaa); border-radius: 4px;
+        color: inherit; background: var(--material-background, transparent); }
+      .wordsync-maimemo-popup button:disabled { opacity: .55; cursor: default; }
+      .wordsync-maimemo-popup button[aria-pressed="true"] { border-color: #3979ce; }
+      .wordsync-maimemo-popup .wordsync-add { flex: none; padding: 3px 11px; }
+      .wordsync-maimemo-popup input { flex: 1; min-width: 0; box-sizing: border-box; padding: 3px 6px;
+        border: 1px solid var(--fill-quaternary, #aaa); border-radius: 4px; font: inherit;
+        color: inherit; background: var(--material-background, transparent); }
+      .wordsync-maimemo-popup .wordsync-status { color: var(--fill-secondary, #888); min-height: 16px; }
+    `;
+
 export class ReaderPopup {
   constructor({ event, captureService, store, settings, worker, onDispose }) {
     this.event = event;
@@ -48,25 +70,7 @@ export class ReaderPopup {
     this.root = this.element("section", null, "wordsync-maimemo-popup");
     this.root.setAttribute("aria-label", "加入墨墨背单词");
     const style = this.element("style");
-    style.textContent = `
-      .wordsync-maimemo-popup { border-top: 1px solid var(--fill-quinary, #ddd); padding: 7px 8px;
-        width: 248px; max-width: 100%; box-sizing: border-box; font: 12px/1.45 system-ui; color: inherit; }
-      .wordsync-maimemo-popup .wordsync-row { display: flex; align-items: center; gap: 4px;
-        flex-wrap: wrap; margin-bottom: 5px; }
-      .wordsync-maimemo-popup .wordsync-row:empty { display: none; }
-      .wordsync-maimemo-popup .wordsync-tag { color: var(--fill-secondary, #888); flex: none; }
-      .wordsync-maimemo-popup .wordsync-words { max-height: 76px; overflow: auto; }
-      .wordsync-maimemo-popup button { cursor: pointer; padding: 2px 7px; font: inherit;
-        border: 1px solid var(--fill-quaternary, #aaa); border-radius: 4px;
-        color: inherit; background: var(--material-background, transparent); }
-      .wordsync-maimemo-popup button:disabled { opacity: .55; cursor: default; }
-      .wordsync-maimemo-popup button[aria-pressed="true"] { border-color: #3979ce; }
-      .wordsync-maimemo-popup .wordsync-add { flex: none; padding: 3px 11px; }
-      .wordsync-maimemo-popup input { flex: 1; min-width: 0; box-sizing: border-box; padding: 3px 6px;
-        border: 1px solid var(--fill-quaternary, #aaa); border-radius: 4px; font: inherit;
-        color: inherit; background: var(--material-background, transparent); }
-      .wordsync-maimemo-popup .wordsync-status { color: var(--fill-secondary, #888); min-height: 16px; }
-    `;
+    style.textContent = POPUP_STYLE;
     this.root.append(style);
 
     // 选区里有多个词时先挑一个；只有一个词就不占这一行。
@@ -102,7 +106,10 @@ export class ReaderPopup {
     this.status.setAttribute("aria-live", "polite");
     this.root.append(entry, this.status);
 
-    this.listen(this.input, "input", () => { this.markForm(this.input.value); void this.refreshStatus(); });
+    this.listen(this.input, "input", () => {
+      this.markForm(this.input.value);
+      void this.refreshStatus();
+    });
     this.listen(this.addButton, "click", () => void this.add());
     // 允许编辑框接收焦点，同时防止输入及点击被阅读器当成注释快捷键。
     for (const type of ["pointerdown", "mousedown", "mouseup", "click"]) {

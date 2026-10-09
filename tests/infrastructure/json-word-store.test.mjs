@@ -13,7 +13,14 @@ test("持久化记录重启恢复，并发加入同一原形只保存一条", as
   t.after(() => rm(directory, { recursive: true, force: true }));
   const target = path.join(directory, "words.json");
   const file = {
-    async read() { try { return await readFile(target, "utf8"); } catch (error) { if (error.code === "ENOENT") return null; throw error; } },
+    async read() {
+      try {
+        return await readFile(target, "utf8");
+      } catch (error) {
+        if (error.code === "ENOENT") return null;
+        throw error;
+      }
+    },
     async writeAtomic(text) { await writeFile(target + ".tmp", text); await rename(target + ".tmp", target); },
   };
   const store = new JsonWordStore({ file });

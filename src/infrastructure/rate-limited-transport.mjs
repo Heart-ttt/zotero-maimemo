@@ -19,8 +19,11 @@ export class RateLimitedTransport {
     const task = this.tail.then(async () => {
       if (this.closed) throw new Error("同步已停止");
       if (options.isAllowed && !options.isAllowed()) throw new Error("同步配置已变化，请重试");
-      let delay;
-      while ((delay = this.requiredDelay()) > 0) await this.wait(delay);
+      let delay = this.requiredDelay();
+      while (delay > 0) {
+        await this.wait(delay);
+        delay = this.requiredDelay();
+      }
       if (this.closed) throw new Error("同步已停止");
       if (options.isAllowed && !options.isAllowed()) throw new Error("同步配置已变化，请重试");
       this.timestamps.push(this.now());
@@ -40,15 +43,21 @@ export class RateLimitedTransport {
       this.timestamps.length ? this.timestamps.at(-1) + this.minimumInterval : time);
     for (const window of this.windows) {
       const recent = this.timestamps.filter((stamp) => stamp > time - window.duration);
-      if (recent.length >= window.maximum) until = Math.max(until,
-        recent[recent.length - window.maximum] + window.duration);
+      if (recent.length >= window.maximum) {
+        // 这个窗口已经满了，要等最早那次请求滑出窗口。
+        const earliestInWindow = recent[recent.length - window.maximum];
+        until = Math.max(until, earliestInWindow + window.duration);
+      }
     }
     return Math.max(0, until - time);
   }
 
   wait(delay) {
     return new Promise((resolve, reject) => {
-      const timer = this.timers.setTimeout(() => { this.waiter = null; resolve(); }, delay);
+      const timer = this.timers.setTimeout(() => {
+        this.waiter = null;
+        resolve();
+      }, delay);
       this.waiter = { timer, reject };
     });
   }
