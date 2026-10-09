@@ -11,10 +11,14 @@ export class SettingsService {
   }
 
   async read() {
+    // Token 明文回填到输入框：它只是墨墨的开放 API 凭证，不绑定支付或身份，
+    // 一直显示比「已保存，留空保留」那种猜谜式提示好用。
+    const token = (await this.credentials.getToken()) ?? "";
     return {
       notepad: this.preferences.getNotepad(),
       addToStudyPlan: this.preferences.getStudyPlanEnabled(),
-      hasToken: Boolean(await this.credentials.getToken()),
+      token,
+      hasToken: Boolean(token),
     };
   }
 
@@ -42,10 +46,10 @@ export class SettingsService {
     return directory.list();
   }
 
+  /** 只建，不接管当前词本。换不换由用户再点一次「使用所选词本」决定。 */
   async createNotepad({ title }, draftToken = "") {
     const directory = this.createDirectory(await this.resolveToken(draftToken));
-    const notepad = await directory.create({ title });
-    return this.selectNotepad(notepad);
+    return directory.create({ title });
   }
 
   selectNotepad(notepad) {
@@ -58,15 +62,16 @@ export class SettingsService {
     return task;
   }
 
-  /** 只读：验证 Token 能用，并确认已选词本还在。不写任何东西，也不启动队列。 */
+  /**
+   * 只验 Token 能不能用。列一次词本是最轻的只读调用，不写任何东西、不启动队列。
+   *
+   * 这里不检查已选词本还在不在：没选词本不是「连接失败」，词本被删了也该在
+   * 列表和同步那边报，不该让人以为是 Token 的问题。
+   */
   async testConnection(draftToken = "") {
     const directory = this.createDirectory(await this.resolveToken(draftToken));
-    const selected = this.preferences.getNotepad();
-    if (!selected) {
-      const notepads = await directory.list();
-      throw new Error(`Token 可用，账号里有 ${notepads.length} 个云词本，请先选择一个`);
-    }
-    return directory.get(selected.id);
+    // 顺手把列表回给调用方，免得测完再查一次，同样的请求发两遍。
+    return directory.list();
   }
 
   async clearToken() {

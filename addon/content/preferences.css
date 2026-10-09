@@ -1,14 +1,46 @@
 .wordsync-settings { max-width: 660px; padding: 0 8px 16px; line-height: 1.6; }
 .wordsync-settings p { margin: 10px 0; }
 .wordsync-settings h2 { margin: 24px 0 8px; font-size: 1.15em; }
-.wordsync-settings .wordsync-field { display: flex; flex-direction: column; gap: 6px; margin: 18px 0 8px; }
-.wordsync-settings input[type="password"] { padding: 8px 10px; font: inherit; }
+
+/* 文案长度会随查询结果变化，给这些行固定高度，避免排版跳动。 */
+.wordsync-settings .wordsync-line { min-height: 1.6em; margin: 6px 0; }
+
+.wordsync-settings .wordsync-field { display: block; margin: 18px 0 6px; }
+.wordsync-settings .wordsync-row { display: flex; gap: 8px; align-items: center; margin: 6px 0; }
+.wordsync-settings .wordsync-row input { flex: 1; min-width: 0; }
+.wordsync-settings .wordsync-grow { flex: 1; min-width: 0; margin: 0; }
+
+/* 下拉占满剩下的宽度，选项文字再长也不会把旁边的按钮挤走。 */
+.wordsync-settings .wordsync-select { flex: 1; min-width: 0; }
+
+/* 同一行里的输入框、下拉、按钮等高，否则参差不齐。 */
+.wordsync-settings .wordsync-row input,
+.wordsync-settings .wordsync-row select,
+.wordsync-settings button {
+  box-sizing: border-box; height: 30px; padding: 0 10px; font: inherit; line-height: 1.4;
+}
+
 .wordsync-settings .wordsync-checkbox { display: flex; gap: 8px; align-items: center; }
-.wordsync-settings .wordsync-buttons { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
-.wordsync-settings button { padding: 6px 12px; font: inherit; cursor: pointer; }
+.wordsync-settings .wordsync-buttons { display: flex; flex-wrap: wrap; gap: 8px; margin: 8px 0; }
+
+.wordsync-settings button {
+  display: inline-flex; align-items: center; justify-content: center; text-align: center;
+  flex: none; min-width: 112px; cursor: pointer;
+}
 .wordsync-settings button:disabled { cursor: default; opacity: .6; }
+
+/* 正在用的那个词本，列表底色变绿，旁边标一句「已选择」。 */
+.wordsync-settings select.wordsync-chosen { background-color: rgba(26, 127, 55, .14); border-color: #1a7f37; }
+.wordsync-settings .wordsync-chosen-mark { flex: none; color: #1a7f37; }
+/* 隐藏时仍然占位，否则它一出现下拉框就会被挤窄，宽度来回跳。 */
+.wordsync-settings .wordsync-chosen-mark[hidden] { display: inline; visibility: hidden; }
+
+/* 结果染在小字那一行，按钮本身不变色。 */
+.wordsync-settings .wordsync-test-ok { color: #1a7f37; }
+.wordsync-settings .wordsync-test-bad { color: #c0392b; }
+
 .wordsync-settings .wordsync-secondary { color: var(--fill-secondary, #666); font-size: .95em; }
-.wordsync-settings .wordsync-message { min-height: 26px; }
+.wordsync-settings .wordsync-message { min-height: 1.6em; }
 .wordsync-settings .wordsync-records { max-height: 350px; overflow: auto; padding-left: 22px; }
 .wordsync-settings .wordsync-records li { margin: 8px 0; overflow-wrap: anywhere; }
 .wordsync-settings .wordsync-record-error { font-size: .9em; color: var(--fill-secondary, #666); }
