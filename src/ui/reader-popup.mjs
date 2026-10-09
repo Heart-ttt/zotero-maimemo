@@ -1,16 +1,16 @@
 import { extractWordCandidates } from "../domain/selection.mjs";
+import { lemmaChoices } from "../domain/lemmatizer.mjs";
 import { normalizeLemma } from "../domain/word-record.mjs";
 import { safeErrorMessage } from "../application/sync-error.mjs";
 import { wordStatusText } from "./word-status.mjs";
 
 export class ReaderPopup {
-  constructor({ event, captureService, store, settings, worker, openSettings, onDispose }) {
+  constructor({ event, captureService, store, settings, worker, onDispose }) {
     this.event = event;
     this.captureService = captureService;
     this.store = store;
     this.settings = settings;
     this.worker = worker;
-    this.openSettings = openSettings;
     this.onDispose = onDispose;
     this.alive = true;
     this.revision = 0;
@@ -49,55 +49,61 @@ export class ReaderPopup {
     this.root.setAttribute("aria-label", "加入墨墨背单词");
     const style = this.element("style");
     style.textContent = `
-      .wordsync-maimemo-popup { border-top: 1px solid var(--fill-quinary, #ddd); padding: 10px 8px;
-        width: 260px; max-width: 100%; box-sizing: border-box; font: 13px/1.5 system-ui; color: inherit; }
-      .wordsync-maimemo-popup .wordsync-title { font-weight: 600; margin-bottom: 7px; }
-      .wordsync-maimemo-popup .wordsync-candidates { display: flex; flex-wrap: wrap; gap: 5px;
-        max-height: 100px; overflow: auto; margin-bottom: 8px; }
-      .wordsync-maimemo-popup button { cursor: pointer; padding: 4px 9px; font: inherit;
-        border: 1px solid var(--fill-quaternary, #aaa); border-radius: 5px;
+      .wordsync-maimemo-popup { border-top: 1px solid var(--fill-quinary, #ddd); padding: 7px 8px;
+        width: 248px; max-width: 100%; box-sizing: border-box; font: 12px/1.45 system-ui; color: inherit; }
+      .wordsync-maimemo-popup .wordsync-row { display: flex; align-items: center; gap: 4px;
+        flex-wrap: wrap; margin-bottom: 5px; }
+      .wordsync-maimemo-popup .wordsync-row:empty { display: none; }
+      .wordsync-maimemo-popup .wordsync-tag { color: var(--fill-secondary, #888); flex: none; }
+      .wordsync-maimemo-popup .wordsync-words { max-height: 76px; overflow: auto; }
+      .wordsync-maimemo-popup button { cursor: pointer; padding: 2px 7px; font: inherit;
+        border: 1px solid var(--fill-quaternary, #aaa); border-radius: 4px;
         color: inherit; background: var(--material-background, transparent); }
       .wordsync-maimemo-popup button:disabled { opacity: .55; cursor: default; }
       .wordsync-maimemo-popup button[aria-pressed="true"] { border-color: #3979ce; }
-      .wordsync-maimemo-popup input { box-sizing: border-box; width: 100%; padding: 5px 7px;
-        border: 1px solid var(--fill-quaternary, #aaa); border-radius: 5px; font: inherit;
+      .wordsync-maimemo-popup .wordsync-add { flex: none; padding: 3px 11px; }
+      .wordsync-maimemo-popup input { flex: 1; min-width: 0; box-sizing: border-box; padding: 3px 6px;
+        border: 1px solid var(--fill-quaternary, #aaa); border-radius: 4px; font: inherit;
         color: inherit; background: var(--material-background, transparent); }
-      .wordsync-maimemo-popup .wordsync-status { margin: 7px 0; min-height: 20px; }
-      .wordsync-maimemo-popup .wordsync-actions { display: flex; gap: 7px; justify-content: space-between; }
+      .wordsync-maimemo-popup .wordsync-status { color: var(--fill-secondary, #888); min-height: 16px; }
     `;
-    this.root.append(style, this.element("div", "墨墨背单词", "wordsync-title"));
-    const chooser = this.element("div", null, "wordsync-candidates");
+    this.root.append(style);
+
+    // 选区里有多个词时先挑一个；只有一个词就不占这一行。
     this.choiceButtons = [];
     if (this.candidates.length > 1) {
-      this.root.append(this.element("div", "选择一个单词："), chooser);
+      const words = this.element("div", null, "wordsync-row wordsync-words");
       for (const word of this.candidates) {
         const button = this.element("button", word);
         button.type = "button";
         this.listen(button, "click", () => this.selectWord(word));
         this.choiceButtons.push(button);
-        chooser.append(button);
+        words.append(button);
       }
+      this.root.append(words);
     }
-    const label = this.element("label", "单词原形（可修改）：");
+
+    this.formRow = this.element("div", null, "wordsync-row");
+    this.formButtons = [];
+    this.root.append(this.formRow);
+
+    const entry = this.element("div", null, "wordsync-row");
     this.input = this.element("input");
     this.input.type = "text";
     this.input.maxLength = 100;
-    this.input.setAttribute("aria-label", "单词原形");
-    label.append(this.input);
+    this.input.setAttribute("aria-label", "要加入的单词");
+    this.addButton = this.element("button", "加入", "wordsync-add");
+    this.addButton.type = "button";
+    this.addButton.disabled = true;
+    entry.append(this.input, this.addButton);
+
     this.status = this.element("div", "", "wordsync-status");
     this.status.setAttribute("role", "status");
     this.status.setAttribute("aria-live", "polite");
-    this.addButton = this.element("button", "加入");
-    this.addButton.type = "button";
-    this.addButton.disabled = true;
-    const settingsButton = this.element("button", "设置");
-    settingsButton.type = "button";
-    const actions = this.element("div", null, "wordsync-actions");
-    actions.append(this.addButton, settingsButton);
-    this.root.append(label, this.status, actions);
-    this.listen(this.input, "input", () => void this.refreshStatus());
+    this.root.append(entry, this.status);
+
+    this.listen(this.input, "input", () => { this.markForm(this.input.value); void this.refreshStatus(); });
     this.listen(this.addButton, "click", () => void this.add());
-    this.listen(settingsButton, "click", () => this.openSettings());
     // 允许编辑框接收焦点，同时防止输入及点击被阅读器当成注释快捷键。
     for (const type of ["pointerdown", "mousedown", "mouseup", "click"]) {
       this.listen(this.root, type, (event) => event.stopPropagation());
@@ -154,9 +160,46 @@ export class ReaderPopup {
   selectWord(surface) {
     if (this.busy || !this.alive) return;
     this.surface = surface;
-    this.input.value = surface.toLowerCase();
     for (const button of this.choiceButtons) button.setAttribute("aria-pressed", String(button.textContent === surface));
+    this.renderForms(surface);
+  }
+
+  /**
+   * 列出这个词可以加入的形态。墨墨把 attenuate 和 attenuated 当两个词条，
+   * 该背动词还是形容词只有读的人知道，所以摆出来让他点，不替他决定。
+   */
+  renderForms(surface) {
+    const choices = lemmaChoices(surface);
+    const value = choices[0] ?? surface.toLocaleLowerCase("en-US");
+    this.formButtons = [];
+    this.formRow.replaceChildren();
+    if (choices.length > 1) {
+      this.formRow.append(this.element("span", "词形", "wordsync-tag"));
+      for (const form of choices) {
+        const button = this.element("button", form);
+        button.type = "button";
+        this.listen(button, "click", () => this.selectForm(form));
+        this.formButtons.push(button);
+        this.formRow.append(button);
+      }
+    }
+    this.input.value = value;
+    this.markForm(value);
     void this.refreshStatus();
+  }
+
+  selectForm(form) {
+    if (this.busy || !this.alive) return;
+    this.input.value = form;
+    this.markForm(form);
+    void this.refreshStatus();
+  }
+
+  markForm(value) {
+    const current = value.trim().toLocaleLowerCase("en-US");
+    for (const button of this.formButtons) {
+      button.setAttribute("aria-pressed", String(button.textContent === current));
+    }
   }
 
   async refreshStatus() {
@@ -188,7 +231,7 @@ export class ReaderPopup {
     ++this.revision;
     this.input.disabled = true;
     this.addButton.disabled = true;
-    for (const button of this.choiceButtons) button.disabled = true;
+    for (const button of [...this.choiceButtons, ...this.formButtons]) button.disabled = true;
     try {
       const config = await this.settings.read();
       const result = await this.captureService.addFromSelection({
@@ -209,7 +252,7 @@ export class ReaderPopup {
       this.busy = false;
       if (this.alive) {
         this.input.disabled = false;
-        for (const button of this.choiceButtons) button.disabled = false;
+        for (const button of [...this.choiceButtons, ...this.formButtons]) button.disabled = false;
       }
     }
   }

@@ -4,7 +4,7 @@ import { JSDOM } from "jsdom";
 import { ReaderPopup } from "../../src/ui/reader-popup.mjs";
 import { WordCaptureService } from "../../src/application/word-capture-service.mjs";
 import { InMemoryWordStore } from "../../src/infrastructure/in-memory-word-store.mjs";
-import { IdentityLemmatizer } from "../../src/domain/lemmatizer.mjs";
+import { IdentityLemmatizer, RuleLemmatizer } from "../../src/domain/lemmatizer.mjs";
 import { createWordRecord } from "../../src/domain/word-record.mjs";
 import { deferred, settle } from "../helpers/fakes.mjs";
 
@@ -147,6 +147,54 @@ test("清理观察器失败时不影响已经挂载的弹窗", async () => {
   assert.equal(popup.mount(), true);
   assert.equal(popup.alive, true);
   assert.ok(dom.window.document.querySelector(".wordsync-maimemo-popup"));
+  popup.dispose();
+  dom.window.close();
+});
+
+test("词形候选并列给出，选哪个由人定；只有一种形态时不占行", async () => {
+  const dom = new JSDOM("<!doctype html><body></body>");
+  const store = new InMemoryWordStore();
+  const popup = new ReaderPopup({
+    event: {
+      doc: dom.window.document,
+      params: { annotation: { text: "the attenuated signal" } },
+      append: (root) => dom.window.document.body.append(root),
+    },
+    captureService: new WordCaptureService({ store, lemmatizer: new RuleLemmatizer() }),
+    store,
+    settings: { async read() { return { addToStudyPlan: true }; } },
+    worker: { subscribe() { return () => {}; }, kick() {} },
+  });
+  popup.mount();
+  await settle();
+
+  // 选区里有多个词，先挑词；挑中的词再给词形。
+  popup.selectWord("attenuated");
+  await settle();
+  assert.deepEqual(popup.formButtons.map((button) => button.textContent), ["attenuate", "attenuated"],
+    "动词原形和分词形容词在墨墨是两个词条，都要摆出来");
+  assert.equal(popup.input.value, "attenuate", "默认仍是原形，收录率最稳");
+  assert.equal(popup.formButtons[0].getAttribute("aria-pressed"), "true");
+
+  popup.formButtons[1].click();
+  await settle();
+  assert.equal(popup.input.value, "attenuated", "点哪个就用哪个");
+  assert.equal(popup.formButtons[1].getAttribute("aria-pressed"), "true");
+  assert.equal(popup.formButtons[0].getAttribute("aria-pressed"), "false");
+
+  popup.addButton.click();
+  await settle();
+  assert.equal((await store.listAll())[0].lemma, "attenuated", "存的是你点的那个形态");
+
+  // 没有第二种形态时，这一行不渲染任何按钮。
+  popup.selectWord("signal");
+  await settle();
+  assert.deepEqual(popup.formButtons, []);
+  assert.equal(popup.formRow.childNodes.length, 0);
+
+  // 设置入口已从弹窗去掉。
+  assert.equal([...popup.root.querySelectorAll("button")].some((b) => b.textContent === "设置"), false);
+
   popup.dispose();
   dom.window.close();
 });

@@ -248,17 +248,45 @@ function derivationalCandidates(word) {
   return results;
 }
 
+function normalizeWord(surface) {
+  if (typeof surface !== "string") throw new TypeError("surface must be a string");
+  return surface.normalize("NFKC").replaceAll("’", "'").trim().toLocaleLowerCase("en-US");
+}
+
+const isWord = (item) => item.length >= 2 && LEMMA_PATTERN.test(item);
+
 /**
  * 返回按可信度排序的原形候选，第一个是首选。原词本身总在列表里，
  * 因为它可能已经是原形（analysis、process、focus 都以 s 结尾）。
+ * 里面会混进 denot、attenuat 这类只是拼写猜测的词干，给词库仲裁用，不要直接展示。
  */
 export function lemmaCandidates(surface) {
-  if (typeof surface !== "string") throw new TypeError("surface must be a string");
-  const word = surface.normalize("NFKC").replaceAll("’", "'").trim().toLocaleLowerCase("en-US");
+  const word = normalizeWord(surface);
   if (!word) return [];
 
   const ordered = [...inflectionalCandidates(word), word, ...derivationalCandidates(word)];
-  return [...new Set(ordered)].filter((item) => item.length >= 2 && LEMMA_PATTERN.test(item));
+  return [...new Set(ordered)].filter(isWord);
+}
+
+/**
+ * 给人看的候选：首选原形、原词本身、以及派生形式。
+ * 不含那些只是拼写猜测的词干，所以可以直接摆进弹窗让用户点。
+ *
+ * 墨墨词库对变形词的收录没有规律：requested 没有词条，必须还原成 request；
+ * 而 attenuated 和 attenuate 都是独立词条，是两张卡，该背哪个只有读的人知道。
+ */
+export function lemmaChoices(surface) {
+  const word = normalizeWord(surface);
+  if (!word) return [];
+
+  const choices = [];
+  const [primary] = lemmaCandidates(word);
+  if (primary) choices.push(primary);
+  if (word !== primary) choices.push(word);
+  for (const item of derivationalCandidates(word)) {
+    if (!choices.includes(item)) choices.push(item);
+  }
+  return choices.filter(isWord);
 }
 
 export class RuleLemmatizer {

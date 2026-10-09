@@ -114,7 +114,6 @@ export class WordSyncPlugin {
     const popup = new ReaderPopup({
       event, captureService: this.captureService, store: this.store,
       settings: this.settings, worker: this.worker,
-      openSettings: () => this.Zotero.Utilities.Internal.openPreferences(this.paneID),
       onDispose: (instance) => this.popups.delete(instance),
     });
     try {
