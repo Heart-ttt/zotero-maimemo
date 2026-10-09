@@ -16,8 +16,10 @@ test("XPI 包结构完整，真实打包代码可经 bootstrap 加载并注销",
   const files = unzipSync(zipped);
   assert.deepEqual(Object.keys(files).sort(), ["bootstrap.js", "content/icon.svg", "content/preferences.css", "content/preferences.xhtml", "content/runtime.js", "manifest.json"]);
   const manifest = JSON.parse(strFromU8(files["manifest.json"]));
-  assert.equal(manifest.applications.zotero.strict_min_version, "6.999");
-  assert.equal(manifest.version, pkg.version);
+  assert.equal(manifest.applications.zotero.strict_min_version, "10.0");
+  assert.equal(manifest.version, pkg.version, "版本以 package.json 为准，构建时注入");
+  // 没填仓库地址就不写 update_url，免得 Zotero 一直请求一个不存在的地址。
+  assert.equal("update_url" in manifest.applications.zotero, Boolean(pkg.repository));
   const runtime = strFromU8(files["content/runtime.js"]);
   assert.equal(runtime.includes("fixture-token"), false);
   assert.equal(/\b[a-f0-9]{64}\b/i.test(runtime), false);

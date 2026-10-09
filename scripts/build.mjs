@@ -36,7 +36,37 @@ async function copyResources(directory, relative = "") {
 }
 await copyResources(source);
 const manifest = JSON.parse(new TextDecoder().decode(files["manifest.json"]));
+if (manifest.version && manifest.version !== pkg.version) {
+  // 版本以 package.json 为准，这里只提醒源文件别放着一个对不上的值。
+  console.warn(`提醒：addon/manifest.json 的版本是 ${manifest.version}，构建用的是 ${pkg.version}`);
+}
 manifest.version = pkg.version;
+
+// 仓库地址填了才接自动更新。没填就不写 update_url，
+// 免得 Zotero 一直去请求一个不存在的地址。
+const slug = String(pkg.repository || "").replace(/^.*github\.com[/:]/, "").replace(/\.git$/, "").replace(/\/$/, "");
+const addonID = manifest.applications?.zotero?.id;
+if (slug && addonID) {
+  const branch = process.env.UPDATE_BRANCH || "main";
+  manifest.applications.zotero.update_url =
+    `https://raw.githubusercontent.com/${slug}/${branch}/update.json`;
+  const updates = {
+    addons: {
+      [addonID]: {
+        updates: [{
+          version: pkg.version,
+          update_link: `https://github.com/${slug}/releases/download/v${pkg.version}/${pkg.name}-${pkg.version}.xpi`,
+          applications: { zotero: { strict_min_version: manifest.applications.zotero.strict_min_version } },
+        }],
+      },
+    },
+  };
+  await writeFile(path.join(project, "update.json"), JSON.stringify(updates, null, 2) + "\n");
+  console.log("已更新 update.json");
+} else {
+  console.log("package.json 没填 repository，跳过 update.json，构建产物不带自动更新");
+}
+
 files["manifest.json"] = strToU8(JSON.stringify(manifest, null, 2) + "\n");
 await writeFile(path.join(staging, "manifest.json"), files["manifest.json"]);
 

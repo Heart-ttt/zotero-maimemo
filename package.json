@@ -4,6 +4,8 @@
   "private": true,
   "type": "module",
   "description": "Zotero 与墨墨背单词的单词加入与同步核心。",
+  "repository": "",
+  "license": "MIT",
   "scripts": {
     "build": "node scripts/build.mjs",
     "test": "node --test",
