@@ -22,7 +22,6 @@
 
 ## 已完成
 
-- 竞品调研 → [2026-09-21-survey.md](2026-09-21-survey.md)
 - 开放 API 实测 → [2026-09-21-api-probe.md](2026-09-21-api-probe.md)
 - 前置验证脚本 `scripts/verify-maimemo.sh`，2026-10-04 跑过 auth、coverage、study 三项，结果在 `out/`（gitignore，不在版本库里）
 - 词形还原从空壳换成规则实现，58 个真实用例通过

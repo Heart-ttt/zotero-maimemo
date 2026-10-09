@@ -47,4 +47,3 @@ npm run build   # 打 xpi
 - 范围与已知限制 → [docs/SCOPE.md](docs/SCOPE.md)
 - 进度与待办 → [docs/HANDOFF.md](docs/HANDOFF.md)
 - 墨墨 API 实测 → [docs/2026-09-21-api-probe.md](docs/2026-09-21-api-probe.md)
-- 竞品调研 → [docs/2026-09-21-survey.md](docs/2026-09-21-survey.md)
