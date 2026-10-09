@@ -1,5 +1,5 @@
 export function wordStatusText(record) {
-  if (!record) return "确认单词后加入「Zotero 背诵」";
+  if (!record) return "确认后加入云词本";
   if (record.status === "synced") {
     return record.inStudyPlan ? "已同步到词本和学习计划" : "已同步到词本";
   }

@@ -9,8 +9,17 @@ export class ZoteroPreferences {
     this.prefs = Zotero.Prefs;
   }
 
+  // 从未写过的 pref 在不同 Zotero 版本上有的返回 undefined、有的抛错，一律兜住。
+  read(key) {
+    try {
+      return this.prefs.get(key);
+    } catch {
+      return undefined;
+    }
+  }
+
   getStudyPlanEnabled() {
-    const value = this.prefs.get(STUDY_PLAN_PREF);
+    const value = this.read(STUDY_PLAN_PREF);
     return typeof value === "boolean" ? value : true;
   }
 
@@ -19,9 +28,9 @@ export class ZoteroPreferences {
   }
 
   getNotepad() {
-    const id = this.prefs.get(NOTEPAD_ID_PREF);
+    const id = this.read(NOTEPAD_ID_PREF);
     if (typeof id !== "string" || !id) return null;
-    const title = this.prefs.get(NOTEPAD_TITLE_PREF);
+    const title = this.read(NOTEPAD_TITLE_PREF);
     return { id, title: typeof title === "string" && title ? title : "(未命名)" };
   }
 

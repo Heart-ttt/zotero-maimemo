@@ -17,20 +17,27 @@ export class SettingsPage {
 
   query(name) { return this.root.querySelector(`[data-wordsync="${name}"]`); }
 
+  // 界面少了哪个元素要说出名字，否则抛出来的是一句看不懂的 undefined 错误。
+  require(name) {
+    const element = this.query(name);
+    if (!element) throw new Error(`设置界面缺少元素：${name}`);
+    return element;
+  }
+
   listen(element, type, callback) {
     element.addEventListener(type, callback);
     this.listeners.push(() => element.removeEventListener(type, callback));
   }
 
   async mount() {
-    this.token = this.query("token");
-    this.studyPlan = this.query("study-plan");
-    this.message = this.query("message");
-    this.notepadList = this.query("notepad-list");
-    this.notepadTitle = this.query("notepad-new-title");
+    this.token = this.require("token");
+    this.studyPlan = this.require("study-plan");
+    this.message = this.require("message");
+    this.notepadList = this.require("notepad-list");
+    this.notepadTitle = this.require("notepad-new-title");
     this.controls = [...this.root.querySelectorAll("button, input, select")];
     this.notepadTitle.placeholder = DEFAULT_MAIMEMO_NOTEPAD_TITLE;
-    this.listen(this.query("notepad-refresh"), "click", () => void this.perform(async () => {
+    this.listen(this.require("notepad-refresh"), "click", () => void this.perform(async () => {
       const notepads = await this.settings.listNotepads(this.token.value);
       if (!this.alive) return;
       this.fillNotepads(notepads);
@@ -38,7 +45,7 @@ export class SettingsPage {
         ? `查到 ${notepads.length} 个云词本，选一个后点「使用所选」`
         : "这个账号还没有云词本，在下面新建一个";
     }));
-    this.listen(this.query("notepad-select"), "click", () => void this.perform(async () => {
+    this.listen(this.require("notepad-select"), "click", () => void this.perform(async () => {
       const option = this.notepadList.selectedOptions?.[0];
       if (!option?.value) throw new Error("请先查询并选择一个云词本");
       await this.onConfigurationChange(
@@ -48,7 +55,7 @@ export class SettingsPage {
       await this.populateSettings();
       this.message.textContent = `已改用云词本「${option.textContent}」`;
     }));
-    this.listen(this.query("notepad-create"), "click", () => void this.perform(async () => {
+    this.listen(this.require("notepad-create"), "click", () => void this.perform(async () => {
       const title = this.notepadTitle.value.trim() || DEFAULT_MAIMEMO_NOTEPAD_TITLE;
       const notepad = await this.onConfigurationChange(
         () => this.settings.createNotepad({ title }, this.token.value),
@@ -59,7 +66,7 @@ export class SettingsPage {
       await this.populateSettings();
       this.message.textContent = `已新建并改用云词本「${notepad.notepad?.title ?? title}」`;
     }));
-    this.listen(this.query("save"), "click", () => void this.perform(async () => {
+    this.listen(this.require("save"), "click", () => void this.perform(async () => {
       await this.onConfigurationChange(async () => this.settings.save({
         token: this.token.value, addToStudyPlan: this.studyPlan.checked,
       }), { resume: true });
@@ -67,17 +74,17 @@ export class SettingsPage {
       await this.populateSettings();
       this.message.textContent = "设置已保存";
     }));
-    this.listen(this.query("test"), "click", () => void this.perform(async () => {
+    this.listen(this.require("test"), "click", () => void this.perform(async () => {
       const notepad = await this.settings.testConnection(this.token.value);
       this.message.textContent = `连接成功，当前云词本「${notepad.title}」`;
     }));
-    this.listen(this.query("clear"), "click", () => void this.perform(async () => {
+    this.listen(this.require("clear"), "click", () => void this.perform(async () => {
       await this.onConfigurationChange(() => this.settings.clearToken(), { resume: false });
       this.token.value = "";
       await this.populateSettings();
       this.message.textContent = "Token 已清除，同步已暂停；本地单词记录已保留";
     }));
-    this.listen(this.query("retry"), "click", () => void this.perform(async () => {
+    this.listen(this.require("retry"), "click", () => void this.perform(async () => {
       await this.worker.retry();
       this.message.textContent = "已安排重试未完成的单词";
     }));

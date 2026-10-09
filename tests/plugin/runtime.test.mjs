@@ -100,3 +100,22 @@ test("清除 Token 中止正在进行的同步，之后不再提交学习计划"
   assert.equal((await plugin.store.listPending()).length, 1);
   await plugin.shutdown();
 });
+
+test("设置页加载失败时给出可读的错误，不留白屏", async () => {
+  const host = createRemoteHost();
+  const plugin = new WordSyncPlugin({ host, pluginID: "test-plugin", rootURI: "file:///addon/", transportOptions: { minimumInterval: 0 } });
+  await plugin.start();
+
+  // 故意给一段缺元素的界面，模拟设置页在真实 Zotero 里渲染不出来的情形。
+  const dom = new JSDOM("<!doctype html><html><body><div id='pane'></div></body></html>");
+  const root = dom.window.document.getElementById("pane");
+  await plugin.mountPreferences(root);
+
+  assert.match(root.textContent, /设置页加载失败/);
+  assert.match(root.textContent, /缺少元素：token/, "要说清楚缺的是哪个元素");
+  assert.equal(plugin.settingsPages.size, 0, "失败的页面不留在实例集合里");
+  assert.ok(host.debug.some((line) => line.includes("设置页加载失败")), "完整堆栈要进 Zotero 日志");
+
+  await plugin.shutdown();
+  dom.window.close();
+});

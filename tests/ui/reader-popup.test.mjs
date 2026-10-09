@@ -198,3 +198,42 @@ test("词形候选并列给出，选哪个由人定；只有一种形态时不�
   popup.dispose();
   dom.window.close();
 });
+
+test("队列整个卡住时，弹窗说清楚卡在哪，而不是一直显示等待同步", async () => {
+  const dom = new JSDOM("<!doctype html><body></body>");
+  const store = new InMemoryWordStore();
+  let notify;
+  const worker = {
+    subscribe(listener) { notify = listener; listener({ kind: "idle", message: "等待加入单词" }); return () => {}; },
+    kick() {},
+  };
+  const popup = new ReaderPopup({
+    event: {
+      doc: dom.window.document,
+      params: { annotation: { text: "mouse" } },
+      append: (root) => dom.window.document.body.append(root),
+    },
+    captureService: new WordCaptureService({ store, lemmatizer: new RuleLemmatizer() }),
+    store,
+    settings: { async read() { return { addToStudyPlan: true }; } },
+    worker,
+  });
+  popup.mount();
+  await settle();
+
+  popup.addButton.click();
+  await settle();
+  assert.equal(popup.status.textContent, "已保存，后台将同步到墨墨");
+
+  // 队列发现没选云词本后停下来，弹窗要把这句话原样透出来。
+  notify({ kind: "error", message: "尚未选择云词本，请在设置中选择或新建一个" });
+  await settle();
+  assert.equal(popup.status.textContent, "尚未选择云词本，请在设置中选择或新建一个");
+
+  notify({ kind: "authentication", message: "请在设置中填写墨墨 Token，单词已保存在本地" });
+  await settle();
+  assert.equal(popup.status.textContent, "请在设置中填写墨墨 Token，单词已保存在本地");
+
+  popup.dispose();
+  dom.window.close();
+});

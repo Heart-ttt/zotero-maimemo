@@ -30,6 +30,7 @@ export function createHost({ token = null, request } = {}) {
   const listeners = new Map();
   const panes = new Map();
   const calls = [];
+  const debug = [];
   const timers = new ManualTimers();
   const host = {
     timers,
@@ -79,9 +80,9 @@ export function createHost({ token = null, request } = {}) {
         unregister(id) { panes.delete(id); },
       },
       Utilities: { Internal: { openPreferences(id) { host.openedPane = id; } } },
-      debug() {},
+      debug(message) { debug.push(String(message)); },
     },
-    files, prefs, logins, listeners, panes, calls,
+    files, prefs, logins, listeners, panes, calls, debug,
   };
   if (token) logins.push({ hostname: "chrome://zotero", httpRealm: "WordSync Maimemo API", password: token });
   return host;

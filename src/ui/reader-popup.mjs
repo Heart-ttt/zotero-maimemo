@@ -117,7 +117,10 @@ export class ReaderPopup {
     });
     this.event.append(this.root);
     this.observeRemoval();
-    this.unsubscribe = this.worker.subscribe(() => { if (!this.busy) void this.refreshStatus(); });
+    this.unsubscribe = this.worker.subscribe((state) => {
+      this.workerState = state;
+      if (!this.busy) void this.refreshStatus();
+    });
     this.selectWord(this.candidates[0]);
     return true;
   }
@@ -214,7 +217,12 @@ export class ReaderPopup {
     try {
       const record = await this.store.findByLemma(lemma);
       if (!this.alive || revision !== this.revision || this.busy) return;
-      this.status.textContent = wordStatusText(record);
+      // 队列整个卡住时（没填 Token、没选云词本、认证失效），说清楚卡在哪，
+      // 否则这里只会一直显示「等待同步」，看不出要去做什么。
+      const blocked = this.workerState?.kind === "authentication" || this.workerState?.kind === "error";
+      this.status.textContent = blocked && (!record || record.status !== "synced")
+        ? this.workerState.message
+        : wordStatusText(record);
       this.addButton.textContent = record ? (record.status === "synced" ? "已同步" : "已加入") : "加入";
       this.addButton.disabled = Boolean(record);
     } catch (error) {
@@ -240,7 +248,9 @@ export class ReaderPopup {
       });
       this.worker.kick();
       if (this.alive) {
-        this.status.textContent = result.kind === "queued" ? "已保存，后台将同步到墨墨" : wordStatusText(result.record);
+        const blocked = this.workerState?.kind === "authentication" || this.workerState?.kind === "error";
+        this.status.textContent = blocked ? this.workerState.message
+          : result.kind === "queued" ? "已保存，后台将同步到墨墨" : wordStatusText(result.record);
         this.addButton.textContent = "已加入";
       }
     } catch (error) {

@@ -132,7 +132,18 @@ export class WordSyncPlugin {
       onDispose: (instance) => this.settingsPages.delete(instance),
     });
     this.settingsPages.add(view);
-    await view.mount();
+    try {
+      await view.mount();
+    } catch (error) {
+      // 设置面板的 onload 吞掉异常就只剩白屏，这里兜住：日志留全栈，界面留一句话。
+      this.settingsPages.delete(view);
+      try { this.Zotero.debug(`墨墨单词同步：设置页加载失败\n${error?.stack || error?.message || error}`); } catch {}
+      try {
+        const notice = root.ownerDocument.createElementNS("http://www.w3.org/1999/xhtml", "p");
+        notice.textContent = `设置页加载失败：${safeErrorMessage(error)}`;
+        root.append(notice);
+      } catch {}
+    }
   }
 
   async changeConfiguration(action, { resume }) {
