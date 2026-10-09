@@ -86,3 +86,23 @@ test("client rejects an HTML response even when a proxy returns HTTP 200", async
 
   await assert.rejects(() => client.listNotepads(), /非 JSON/);
 });
+
+test("墨墨回的英文错误换成中文，认不出的错误码保留原文", async () => {
+  const build = (payload, status = 400) => new MaimemoApiClient({
+    token: "t",
+    fetchImpl: async () => ({ status, ok: false, async json() { return payload; } }),
+  });
+
+  await assert.rejects(
+    () => build({ success: false, errors: [{ code: "common_unauthorized", msg: "Authorization failed" }] }, 401).listNotepads(),
+    /Token 无效或已失效/,
+  );
+  await assert.rejects(
+    () => build({ success: false, errors: [{ code: "notepad_invalid_content", msg: "云词库不存在" }] }).listNotepads(),
+    /云词本内容不合法/,
+  );
+  await assert.rejects(
+    () => build({ success: false, errors: [{ code: "some_new_code", msg: "服务端原文" }] }).listNotepads(),
+    /服务端原文/,
+  );
+});

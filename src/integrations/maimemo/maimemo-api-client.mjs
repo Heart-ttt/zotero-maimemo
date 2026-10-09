@@ -1,3 +1,13 @@
+// 墨墨把错误信息回成英文，直接摆给用户看没有意义。按错误码换成中文，
+// 认不出的码再退回服务端原文。
+const ERROR_MESSAGES = {
+  common_unauthorized: "Token 无效或已失效，请重新填写",
+  common_invalid_param: "请求参数不合法，这是插件的问题",
+  common_internal_error: "墨墨服务端出错，稍后重试",
+  common_not_found: "请求的内容不存在",
+  notepad_invalid_content: "云词本内容不合法",
+};
+
 export class MaimemoApiError extends Error {
   constructor(message, { status = 0, code = null, retryable = false } = {}) {
     super(message);
@@ -84,7 +94,10 @@ export class MaimemoApiClient {
 
     if (!response.ok || payload?.success !== true) {
       const firstError = payload?.errors?.[0] ?? {};
-      const message = String(firstError.msg || `墨墨请求失败（HTTP ${response.status}）`)
+      const fallback = response.status === 401
+        ? ERROR_MESSAGES.common_unauthorized
+        : `墨墨请求失败（HTTP ${response.status}）`;
+      const message = String(ERROR_MESSAGES[firstError.code] || firstError.msg || fallback)
         .replaceAll(this.token, "[redacted]");
       throw new MaimemoApiError(message, {
         status: response.status,
