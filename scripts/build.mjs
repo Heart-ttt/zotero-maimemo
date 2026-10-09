@@ -42,8 +42,9 @@ if (manifest.version && manifest.version !== pkg.version) {
 }
 manifest.version = pkg.version;
 
-// 仓库地址填了才接自动更新。没填就不写 update_url，
-// 免得 Zotero 一直去请求一个不存在的地址。
+// update_url 必须存在：Zotero 10 缺了这个字段会直接拒绝安装，
+// 而且报的是「可能无法与该版本兼容」，跟版本号毫无关系，极易查错方向。
+// 仓库地址填了就覆盖成 GitHub 上的真实地址，没填就沿用 manifest 里的默认值。
 const slug = String(pkg.repository || "").replace(/^.*github\.com[/:]/, "").replace(/\.git$/, "").replace(/\/$/, "");
 const addonID = manifest.applications?.zotero?.id;
 if (slug && addonID) {
@@ -64,7 +65,10 @@ if (slug && addonID) {
   await writeFile(path.join(project, "update.json"), JSON.stringify(updates, null, 2) + "\n");
   console.log("已更新 update.json");
 } else {
-  console.log("package.json 没填 repository，跳过 update.json，构建产物不带自动更新");
+  console.log("package.json 没填 repository，update_url 沿用 manifest 里的默认值，更新检查会 404");
+}
+if (!manifest.applications?.zotero?.update_url) {
+  throw new Error("manifest 缺少 applications.zotero.update_url，Zotero 10 会拒绝安装");
 }
 
 files["manifest.json"] = strToU8(JSON.stringify(manifest, null, 2) + "\n");

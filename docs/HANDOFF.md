@@ -46,6 +46,8 @@
 ## 必须记住的约束
 
 - 路径是 `https://open.maimemo.com/open` + `/api/v1/memo/...`。2026-09-21 实测用的不带 `memo` 的路径也能通，但官方文档里没有，不要再用
+- **`applications.zotero.update_url` 不能从 manifest 里删掉**，Zotero 10 缺了它拒绝安装，
+  却报「可能无法与该版本的 Zotero 兼容」，会把人引到版本号上白查一轮
 - 新建云词本的 `content` 不能为空，空串返回 400 `notepad_invalid_content`。官方文档没写这条
 - `query_study_records` 的 `tags` 过滤传 `WELL_FAMILIAR` 会返回 400，传 `STICKING` 正常。返回的记录里 `tags` 是数组不是文档写的字符串
 - 频控 10 秒 20 次、60 秒 40 次、5 小时 2000 次。**每天 600 条的创建配额对本项目不适用**，那个只计例句、助记、释义
