@@ -1,6 +1,6 @@
 {
   "name": "zotero-wordsync-maimemo",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "type": "module",
   "description": "Zotero 与墨墨背单词的单词加入与同步核心。",

@@ -5,6 +5,8 @@
 // 派生变化（orthogonality → orthogonal）只放进候选，不作为首选，
 // 因为没有词典仲裁时 quality → qual 这类错误比不还原更糟。
 
+import { ENGLISH_WORD_PATTERN } from "./selection.mjs";
+
 function parsePairs(text) {
   const map = new Map();
   for (const line of text.trim().split("\n")) {
@@ -177,7 +179,8 @@ const VOWEL_DIGRAPHS = new Set("ai ay ea ee ei ey ie oa oo ou ow oi oy au aw".sp
 const SILENT_E_AFTER_ER = new Set("adher interfer".split(" "));
 
 const VOWELS = new Set(["a", "e", "i", "o", "u"]);
-const LEMMA_PATTERN = /^[\p{L}][\p{L}'-]*$/u;
+// 跟选区用同一套英文判定，免得两处规则各自漂。
+const LEMMA_PATTERN = ENGLISH_WORD_PATTERN;
 
 function isDoubledEnding(stem) {
   if (stem.length < 4) return false;

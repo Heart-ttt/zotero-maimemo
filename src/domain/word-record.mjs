@@ -1,3 +1,5 @@
+import { ENGLISH_WORD_PATTERN } from "./selection.mjs";
+
 export const WordSyncStatus = Object.freeze({
   QUEUED: "queued",
   PARTIAL: "partial",
@@ -11,7 +13,7 @@ export function normalizeLemma(value) {
   }
 
   const normalized = value.normalize("NFKC").replaceAll("’", "'").trim().toLocaleLowerCase("en-US");
-  if (!normalized || !/^[\p{L}][\p{L}'-]*$/u.test(normalized)) {
+  if (!normalized || !ENGLISH_WORD_PATTERN.test(normalized)) {
     throw new Error(`invalid lemma: ${value}`);
   }
   return normalized;
@@ -23,7 +25,7 @@ export function normalizeSurface(value) {
   }
 
   const normalized = value.normalize("NFKC").trim();
-  if (!/^[\p{L}]+(?:['’-][\p{L}]+)*$/u.test(normalized)) {
+  if (!ENGLISH_WORD_PATTERN.test(normalized)) {
     throw new Error("surface must be one word");
   }
   return normalized;

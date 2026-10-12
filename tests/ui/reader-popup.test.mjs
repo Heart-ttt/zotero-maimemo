@@ -241,3 +241,33 @@ test("队列整个卡住时，弹窗说清楚卡在哪，而不是一直显示�
   popup.dispose();
   dom.window.close();
 });
+
+test("选区里没有英文词时弹窗根本不出现", async () => {
+  const dom = new JSDOM("<!doctype html><body><div id='native'>原生颜色</div></body>");
+  const store = new InMemoryWordStore();
+  const build = (text) => new ReaderPopup({
+    event: {
+      doc: dom.window.document,
+      params: { annotation: { text } },
+      append: (root) => dom.window.document.body.append(root),
+    },
+    captureService: new WordCaptureService({ store, lemmatizer: new RuleLemmatizer() }),
+    store,
+    settings: { async read() { return { addToStudyPlan: true }; } },
+    worker: { subscribe() { return () => {}; }, kick() {} },
+  });
+
+  for (const text of ["这是一段中文", "，。；：！？", "2024", "α β γ"]) {
+    assert.equal(build(text).mount(), false, `选中「${text}」不该弹窗`);
+  }
+  assert.equal(dom.window.document.querySelectorAll(".wordsync-maimemo-popup").length, 0);
+  assert.equal(dom.window.document.querySelector("#native").textContent, "原生颜色", "原生区域不受影响");
+
+  // 混排里有英文就照常弹，并且只列英文那部分。
+  const mixed = build("这个 attenuated 信号很弱");
+  assert.equal(mixed.mount(), true);
+  await settle();
+  assert.deepEqual(mixed.candidates, ["attenuated"]);
+  mixed.dispose();
+  dom.window.close();
+});
