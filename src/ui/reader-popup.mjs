@@ -6,8 +6,10 @@ import { wordStatusText } from "./word-status.mjs";
 
 // 弹窗挂在 Zotero 原生的选中弹窗里，样式只作用于自己这一块。
 // 放在这里而不是 mount() 里，mount 才看得出它在搭什么结构。
+// Zotero 给每个插件区块套了 .section，自带上分隔线和上下内边距，
+// 这里不再画线、不留底边距，否则会叠出两条线和一截空白。
 const POPUP_STYLE = `
-      .wordsync-maimemo-popup { border-top: 1px solid var(--fill-quinary, #ddd); padding: 7px 8px;
+      .wordsync-maimemo-popup { padding: 7px 8px 0;
         width: 248px; max-width: 100%; box-sizing: border-box; font: 12px/1.45 system-ui; color: inherit; }
       .wordsync-maimemo-popup .wordsync-row { display: flex; align-items: center; gap: 4px;
         flex-wrap: wrap; margin-bottom: 5px; }
