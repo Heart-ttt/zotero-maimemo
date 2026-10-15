@@ -1,10 +1,10 @@
 {
-  "name": "zotero-wordsync-maimemo",
-  "version": "1.1.0",
+  "name": "zotero-maimemo",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "description": "Zotero 与墨墨背单词的单词加入与同步核心。",
-  "repository": "",
+  "repository": "https://github.com/Heart-ttt/zotero-maimemo",
   "license": "MIT",
   "scripts": {
     "build": "node scripts/build.mjs",

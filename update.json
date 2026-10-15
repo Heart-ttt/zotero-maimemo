@@ -1,0 +1,17 @@
+{
+  "addons": {
+    "zotero-maimemo@heart-ttt.github.io": {
+      "updates": [
+        {
+          "version": "1.0.0",
+          "update_link": "https://github.com/Heart-ttt/zotero-maimemo/releases/download/v1.0.0/zotero-maimemo-1.0.0.xpi",
+          "applications": {
+            "zotero": {
+              "strict_min_version": "6.999"
+            }
+          }
+        }
+      ]
+    }
+  }
+}
