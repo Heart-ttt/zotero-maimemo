@@ -1,6 +1,6 @@
 # 架构与接入说明
 
-2026-10-09 更新。插件只连接 Zotero 和墨墨背单词，目标云词本在设置页里选，存的是词本 id。
+2026-10-15 按 1.0.0 的代码核对。插件只连接 Zotero 和墨墨背单词，目标云词本在设置页里选，存的是词本 id。
 
 ## 模块职责
 
@@ -12,7 +12,7 @@
 
 `src/integrations/maimemo` 封装接口与返回校验。词本网关先读取原内容，再只追加缺少的一行，保留章节、空行、缩进和换行格式，仅提交合法可写字段。学习计划网关先查单词 ID，再提交 `words: [{ id }]`；新增数不足时查询已有学习记录，未确认就保留 `partial`。
 
-`src/integrations/zotero` 封装宿主依赖。单词文件放在 Zotero 数据目录的 `wordsync-maimemo.json`，由 Zotero 文件工具原子替换。Token 使用 `Services.logins` 的独立认证域 `WordSync Maimemo API`，不会读写 Zotero 同步账号凭据。普通 prefs 仅保存学习计划开关。HTTP 使用 Zotero 官方工具，并隔离可能带请求信息的原生异常。
+`src/integrations/zotero` 封装宿主依赖。单词文件放在 Zotero 数据目录的 `wordsync-maimemo.json`，由 Zotero 文件工具原子替换。Token 使用 `Services.logins` 的独立认证域 `WordSync Maimemo API`，不会读写 Zotero 同步账号凭据。普通 prefs 只存学习计划开关和所选词本的 id、名字。HTTP 使用 Zotero 官方工具，并隔离可能带请求信息的原生异常。
 
 `src/ui` 分别实现阅读器弹窗和设置页。弹窗挂进 Zotero 原生的选中弹窗，列出选区里的词和选中词的词形候选；用修订号防止旧异步查询覆盖新选词状态，点加入时固定词和原形，忙碌期间禁止重复点击。关闭时释放事件、观察器和状态订阅。设置页改动即存，没有保存按钮；测试连接只验 Token 且只读；动作串行排队执行，避免输入框失焦触发的自动保存把紧接着的点击吃掉。
 

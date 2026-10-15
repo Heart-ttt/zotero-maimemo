@@ -87,7 +87,7 @@ Zotero 设置里找到「墨墨单词同步」，粘贴手机端第 1 步复制�
 
 #### 3. 选择云词本
 
-在云词本列表里选一个，点「使用所选词本」。没有合适的，就在上面「新建云词本」里填个名字，点「新建」，再选中它、点「使用所选词本」。
+在云词本列表里选一个，点「使用所选词本」。没有合适的，就在上面「新建云词本」里填个名字，点「新建」，新词本会自动选中，再点「使用所选词本」。
 
 > [!NOTE]
 > 具体操作流程如下图所示:
@@ -122,7 +122,9 @@ npm run lint    # 代码规范检查
 npm run build   # 打包到 dist/
 ```
 
-架构说明见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)，功能范围和已知限制见 [docs/SCOPE.md](docs/SCOPE.md)。
+main 分支受保护，改动走 PR，CI 通过才能合并。
+
+架构说明见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)，功能范围和已知限制见 [docs/SCOPE.md](docs/SCOPE.md)，发布流程和 README 里视频、流程图的生成方法见 [docs/HANDOFF.md](docs/HANDOFF.md)。
 
 ## 免责声明
 
