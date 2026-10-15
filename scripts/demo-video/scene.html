@@ -1,0 +1,517 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>zotero-maimemo demo</title>
+<!--
+  README 演示视频的合成页面。render.mjs 用无头 Chromium 打开它，逐帧调用 renderAt(t) 截图。
+  画面只由时间 t 决定，不用 CSS 动画，这样每一帧都能精确复现。
+-->
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { width: 1920px; height: 1080px; overflow: hidden; }
+  body {
+    position: relative;
+    font-family: "PingFang SC", "Hiragino Sans GB", sans-serif;
+    background: linear-gradient(160deg, #eceef0 0%, #f6f7f8 50%, #e9ebee 100%);
+  }
+
+  /* 镜头：#camera 里的坐标就是窗口截图的像素坐标，推拉镜头只改它的 transform。 */
+  #camera { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+  /* 窗口截图四角带着桌面壁纸，用圆角裁掉。 */
+  #window {
+    position: absolute; left: 0; top: 0; width: 2940px; height: 1846px;
+    border-radius: 30px; overflow: hidden; background: #fff;
+    box-shadow: 0 40px 120px rgba(17, 20, 24, .22), 0 4px 16px rgba(17, 20, 24, .10);
+  }
+  #window img { position: absolute; left: 0; top: 0; }
+  #icon-cover { position: absolute; }
+  #dim { position: absolute; inset: 0; background: #eceef0; opacity: 0; }
+
+  .highlight {
+    position: absolute; opacity: 0; border: 3px solid #f5b83d; border-radius: 12px;
+    box-shadow: 0 0 0 6px rgba(245, 184, 61, .22);
+  }
+  .ripple {
+    position: absolute; width: 90px; height: 90px; margin: -45px 0 0 -45px; opacity: 0;
+    border: 5px solid #f5b83d; border-radius: 50%;
+  }
+  #cursor {
+    position: absolute; left: 0; top: 0; width: 36px; height: 52px; transform-origin: 3px 3px;
+    filter: drop-shadow(0 2px 3px rgba(0, 0, 0, .35));
+  }
+
+  /* 手机压在缩小后的窗口右边缘上，下半截超出画面：词本和复习页要看的都在上半部分。 */
+  #phone {
+    position: absolute; left: 1250px; top: 70px; width: 588px; height: 1274px; padding: 14px;
+    border-radius: 78px; background: #16181b; opacity: 0;
+    box-shadow: 0 30px 90px rgba(17, 20, 24, .32), -18px 0 40px rgba(17, 20, 24, .12), inset 0 0 0 2px #2b2e33;
+  }
+  #screen { position: relative; width: 560px; height: 1246px; border-radius: 64px; overflow: hidden; background: #fff; }
+  #screen > img { position: absolute; left: 0; top: 0; width: 560px; height: 1246px; }
+  #screen .highlight { border-radius: 10px; }
+
+  .caption {
+    position: absolute; transform: translateX(-50%); opacity: 0;
+    padding: 14px 32px; border-radius: 999px; white-space: nowrap;
+    background: rgba(24, 26, 30, .92); color: #fff; letter-spacing: 1px;
+    font: 700 40px/1.2 "Kaiti SC", "STKaiti", "KaiTi", serif;
+  }
+
+  #end {
+    position: absolute; inset: 0; opacity: 0;
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 26px;
+  }
+  #end img { width: 168px; height: 168px; }
+  #end h1 { font: 600 72px/1.1 -apple-system, "Helvetica Neue", sans-serif; color: #1f2329; letter-spacing: .5px; }
+  #end p { font: 400 42px/1.3 "Kaiti SC", "STKaiti", "KaiTi", serif; color: #4b5059; letter-spacing: 2px; }
+</style>
+</head>
+<body>
+  <div id="camera"><div id="window"></div></div>
+  <div id="phone"><div id="screen"></div></div>
+  <div id="captions"></div>
+  <div id="end">
+    <img src="../../addon/content/icon.svg" alt="">
+    <h1>zotero-maimemo</h1>
+    <p>读论文背单词，从此不分家</p>
+  </div>
+
+<script>
+const PICTURES = "../../attachments/Pictures/演示视频素材/";
+const FRAME = { width: 1920, height: 1080 };
+
+// 窗口截图按出场顺序叠放，后一张淡入盖住前一张。开场和结尾是完整窗口，
+// 中间三个状态只截了正文区域，加载后按正文位置自动对齐到参考图上。
+// 几张图缩放一致、内容相同的地方逐像素一样，所以叠上去看不出拼接。
+const WINDOW_SHOTS = [
+  { key: "idle", file: "1-刚打开.png", reference: true },
+  { key: "popup", file: "2-双击选词弹窗.png" },
+  { key: "queued", file: "3-正在同步.png" },
+  { key: "synced", file: "4-已同步全窗口.png" },
+];
+const PHONE_SHOTS = [
+  { key: "before", file: "5-手机词本加入前.jpg" },
+  { key: "after", file: "6-手机词本加入后.jpg" },
+  { key: "review", file: "7-手机复习页.jpg" },
+];
+
+// 这组坐标量自「2-双击选词弹窗.png」，运行时加上它的对齐偏移换算到窗口坐标。换截图后要重新量。
+const POPUP_SPOTS = {
+  start: { x: 1260, y: 1420 },
+  word: { x: 1736, y: 852 },
+  addButton: { x: 1866, y: 1158 },
+  restAfterAdd: { x: 1948, y: 1222 },
+  popupCenter: { x: 1750, y: 1045 },
+  readCenter: { x: 1572, y: 921 },
+  formsRow: { x: 1572, y: 1064, w: 314, h: 68 },
+  statusRow: { x: 1572, y: 1186, w: 338, h: 50 },
+};
+// 工具栏右上角的同步报错图标（红色感叹号），用标题栏底色盖掉。坐标是窗口截图的。
+const ICON_COVER = { x: 2808, y: 12, w: 48, h: 48, color: "#f2f2f2" };
+// 手机截图原始像素坐标（1200x2670）。
+const PHONE_SPOTS = {
+  newRow: { x: 24, y: 708, w: 1152, h: 112 },
+  reviewWord: { x: 430, y: 250, w: 340, h: 200 },
+};
+const PHONE_SCREEN_WIDTH = 560;
+const DIM_OPACITY = 0.24;
+
+// 时间轴，单位秒。区间写成 [开始, 结束]。
+const T = {
+  toRead: [1.6, 2.8],
+  cursorFade: [2.2, 2.45],
+  cursorToWord: [2.3, 3.6],
+  clicks: [3.8, 3.98],
+  popupIn: [4.05, 4.25],
+  toPopup: [6.0, 7.0],
+  formsHighlight: [6.9, 9.6],
+  cursorToAdd: [8.8, 9.7],
+  addClick: 9.95,
+  queuedIn: [10.08, 10.22],
+  cursorRest: [10.25, 10.8],
+  statusHighlight: [10.4, 14.4],
+  syncedIn: [12.5, 12.64],
+  cursorHide: [14.2, 14.5],
+  toFull: [14.4, 15.6],
+  toBackground: [16.0, 17.0],
+  phoneIn: [16.3, 17.2],
+  afterIn: [20.0, 20.4],
+  newRowHighlight: [20.4, 23.0],
+  reviewIn: [23.1, 23.6],
+  reviewHighlight: [23.7, 26.0],
+  outro: [26.2, 26.8],
+  endIn: [26.5, 27.2],
+  duration: 29.5,
+};
+
+// 前半段字幕在画面正中；手机那段挪到左侧窗口下方，不挡手机。
+const CENTER = { x: 960, bottom: 40 };
+const UNDER_WINDOW = { x: 685, bottom: 70 };
+// pauseAt 是这句字幕期间画面静止的时刻，配音念不完时在这里插停顿，见 configureNarration。
+const CAPTIONS = [
+  { from: 0.3, to: 4.05, pauseAt: 1.0, text: "在 Zotero 里读论文，遇到生词", at: CENTER },
+  { from: 4.05, to: 6.9, pauseAt: 5.0, text: "双击选词，弹窗里直接出现插件面板", at: CENTER },
+  { from: 6.9, to: 9.95, pauseAt: 8.0, text: "自动还原成原形 sense，sensing 也列出来可以改选", at: CENTER },
+  { from: 9.95, to: 12.5, pauseAt: 11.5, text: "点「加入」先进本地队列，断网也不丢", at: CENTER },
+  { from: 12.5, to: 15.8, pauseAt: 13.4, text: "几秒后写进云词本和学习计划", at: CENTER },
+  { from: 17.0, to: 20.0, pauseAt: 18.5, text: "打开墨墨里的「Zotero 背诵」词本", at: UNDER_WINDOW },
+  { from: 20.0, to: 23.1, pauseAt: 21.5, text: "App 同步后，sense 已经在词本里", at: UNDER_WINDOW },
+  { from: 23.1, to: 26.2, pauseAt: 24.8, text: "也进了学习计划，当天就能复习", at: UNDER_WINDOW },
+];
+
+// 配音：字幕出现后 NARRATION_LEAD 秒开始念，念完到字幕消失至少留 NARRATION_TAIL 秒。
+const NARRATION_LEAD = 0.25;
+const NARRATION_TAIL = 0.35;
+
+const CURSOR_SVG = `<svg id="cursor" viewBox="0 0 28 40" xmlns="http://www.w3.org/2000/svg">
+  <path d="M2.3 2.3 L2.3 31 L9.2 24.6 L13.6 35 L18.2 33 L13.9 22.9 L23.2 22.9 Z"
+        fill="#111" stroke="#fff" stroke-width="2" stroke-linejoin="round"/></svg>`;
+// 光标尖端在 SVG 里的位置，换算到 36x52 的显示尺寸。
+const CURSOR_TIP = { x: 2.3 * 36 / 28, y: 2.3 * 52 / 40 };
+
+const clamp = (value, low = 0, high = 1) => Math.min(high, Math.max(low, value));
+const lerp = (from, to, amount) => from + (to - from) * amount;
+const easeInOut = (amount) => (amount < 0.5 ? 4 * amount ** 3 : 1 - (-2 * amount + 2) ** 3 / 2);
+const progress = (time, [start, end]) => easeInOut(clamp((time - start) / (end - start)));
+
+// 在 [show, hide] 区间内可见，两端各淡入淡出 fade 秒。
+function visibility(time, [show, hide], fade = 0.25) {
+  return clamp((time - show) / fade) * clamp((hide - time) / fade);
+}
+
+function bezier(from, control, to, amount) {
+  const inverse = 1 - amount;
+  return {
+    x: inverse * inverse * from.x + 2 * inverse * amount * control.x + amount * amount * to.x,
+    y: inverse * inverse * from.y + 2 * inverse * amount * control.y + amount * amount * to.y,
+  };
+}
+
+function loadImage(src) {
+  const image = new Image();
+  image.src = src;
+  return image.decode().then(() => image);
+}
+
+// 按行、按列统计深色像素，得到两条投影曲线。正文行距和栏间距让曲线有明显起伏，
+// 两张图的曲线做互相关就能算出平移量，弹窗和工具栏只占一小块，不影响峰值位置。
+function measureImage(image) {
+  const canvas = document.createElement("canvas");
+  canvas.width = image.naturalWidth;
+  canvas.height = image.naturalHeight;
+  const context = canvas.getContext("2d", { willReadFrequently: true });
+  context.drawImage(image, 0, 0);
+  const { data, width, height } = context.getImageData(0, 0, canvas.width, canvas.height);
+  const luminance = new Uint8Array(width * height);
+  const rows = new Float64Array(height);
+  const columns = new Float64Array(width);
+  for (let y = 0; y < height; y += 1) {
+    for (let x = 0; x < width; x += 1) {
+      const index = y * width + x;
+      const value = 0.299 * data[index * 4] + 0.587 * data[index * 4 + 1] + 0.114 * data[index * 4 + 2];
+      luminance[index] = value;
+      if (value < 110) {
+        rows[y] += 1;
+        columns[x] += 1;
+      }
+    }
+  }
+  return { width, height, luminance, rows, columns };
+}
+
+// 找出 shift，使 moving[k] 与 reference[k + shift] 最相关（皮尔逊相关系数）。
+function bestShift(reference, moving, range) {
+  let best = { shift: 0, score: -Infinity };
+  for (let shift = -range; shift <= range; shift += 1) {
+    const first = Math.max(0, -shift);
+    const last = Math.min(moving.length, reference.length - shift);
+    const count = last - first;
+    if (count < Math.min(reference.length, moving.length) / 2) continue;
+    let sumRef = 0, sumMov = 0, sumRefSq = 0, sumMovSq = 0, sumCross = 0;
+    for (let index = first; index < last; index += 1) {
+      const refValue = reference[index + shift];
+      const movValue = moving[index];
+      sumRef += refValue;
+      sumMov += movValue;
+      sumRefSq += refValue * refValue;
+      sumMovSq += movValue * movValue;
+      sumCross += refValue * movValue;
+    }
+    const covariance = sumCross - sumRef * sumMov / count;
+    const spread = Math.sqrt((sumRefSq - sumRef ** 2 / count) * (sumMovSq - sumMov ** 2 / count));
+    const score = spread > 0 ? covariance / spread : -Infinity;
+    if (score > best.score) best = { shift, score };
+  }
+  return best.shift;
+}
+
+// 对齐后在左栏正文区域比较灰度，数值小说明对齐成功（弹窗只在右栏，不会干扰）。
+function alignmentError(reference, moving, offset) {
+  let total = 0, count = 0;
+  for (let y = 300; y < 1400; y += 3) {
+    for (let x = 300; x < 1400; x += 3) {
+      const movingX = x - offset.x, movingY = y - offset.y;
+      if (movingX < 0 || movingY < 0 || movingX >= moving.width || movingY >= moving.height) continue;
+      total += Math.abs(reference.luminance[y * reference.width + x] - moving.luminance[movingY * moving.width + movingX]);
+      count += 1;
+    }
+  }
+  return total / count;
+}
+
+// 镜头位置用「画面中心对着窗口坐标的哪一点、缩放多少」表示。
+const placeAt = (center, scale) => ({ scale, x: FRAME.width / 2 - center.x * scale, y: FRAME.height / 2 - center.y * scale });
+const placeBox = (left, top, width) => ({ scale: width / 2940, x: left, y: top });
+
+const elements = {};
+const state = {};
+
+async function setup() {
+  const windowLayer = document.getElementById("window");
+  const screen = document.getElementById("screen");
+
+  const windowImages = await Promise.all(WINDOW_SHOTS.map((shot) => loadImage(PICTURES + shot.file)));
+  const phoneImages = await Promise.all(PHONE_SHOTS.map((shot) => loadImage(PICTURES + shot.file)));
+
+  const measures = windowImages.map(measureImage);
+  const reference = measures[WINDOW_SHOTS.findIndex((shot) => shot.reference)];
+  const offsets = measures.map((measure) => ({
+    x: bestShift(reference.columns, measure.columns, 300),
+    y: bestShift(reference.rows, measure.rows, 300),
+  }));
+  const errors = measures.map((measure, index) => alignmentError(reference, measure, offsets[index]));
+
+  WINDOW_SHOTS.forEach((shot, index) => {
+    const image = windowImages[index];
+    image.style.left = `${offsets[index].x}px`;
+    image.style.top = `${offsets[index].y}px`;
+    windowLayer.append(image);
+    elements[shot.key] = image;
+  });
+
+  const popupOffset = offsets[WINDOW_SHOTS.findIndex((shot) => shot.key === "popup")];
+  const spots = Object.fromEntries(Object.entries(POPUP_SPOTS).map(([name, spot]) => [
+    name, { ...spot, x: spot.x + popupOffset.x, y: spot.y + popupOffset.y },
+  ]));
+  state.spots = spots;
+
+  // 完整窗口居中；读正文时推近到段落；加入时推近到弹窗；手机出场时窗口缩到左侧三分之二。
+  state.views = {
+    full: placeBox((FRAME.width - 2940 * 900 / 1846) / 2, 40, 2940 * 900 / 1846),
+    read: placeAt(spots.readCenter, 0.85),
+    popup: placeAt(spots.popupCenter, 1.24),
+    background: placeBox(70, 110, 1230),
+  };
+  state.cameraMoves = [
+    { span: T.toRead, to: state.views.read },
+    { span: T.toPopup, to: state.views.popup },
+    { span: T.toFull, to: state.views.full },
+    { span: T.toBackground, to: state.views.background },
+  ];
+
+  const cover = document.createElement("div");
+  cover.id = "icon-cover";
+  Object.assign(cover.style, {
+    left: `${ICON_COVER.x}px`, top: `${ICON_COVER.y}px`,
+    width: `${ICON_COVER.w}px`, height: `${ICON_COVER.h}px`, background: ICON_COVER.color,
+  });
+  windowLayer.append(cover);
+
+  elements.formsRow = createHighlight(windowLayer, spots.formsRow, 1);
+  elements.statusRow = createHighlight(windowLayer, spots.statusRow, 1);
+  elements.ripples = T.clicks.concat(T.addClick).map(() => {
+    const ripple = document.createElement("div");
+    ripple.className = "ripple";
+    windowLayer.append(ripple);
+    return ripple;
+  });
+  windowLayer.insertAdjacentHTML("beforeend", CURSOR_SVG);
+  elements.cursor = document.getElementById("cursor");
+  const dim = document.createElement("div");
+  dim.id = "dim";
+  windowLayer.append(dim);
+  elements.dim = dim;
+
+  PHONE_SHOTS.forEach((shot, index) => {
+    screen.append(phoneImages[index]);
+    elements[shot.key] = phoneImages[index];
+  });
+  const phoneScale = PHONE_SCREEN_WIDTH / phoneImages[0].naturalWidth;
+  elements.newRow = createHighlight(screen, PHONE_SPOTS.newRow, phoneScale);
+  elements.reviewWord = createHighlight(screen, PHONE_SPOTS.reviewWord, phoneScale);
+
+  const captionArea = document.getElementById("captions");
+  elements.captions = CAPTIONS.map((caption) => {
+    const node = document.createElement("div");
+    node.className = "caption";
+    node.textContent = caption.text;
+    node.style.left = `${caption.at.x}px`;
+    node.style.bottom = `${caption.at.bottom}px`;
+    captionArea.append(node);
+    return node;
+  });
+
+  elements.camera = document.getElementById("camera");
+  elements.window = windowLayer;
+  elements.phone = document.getElementById("phone");
+  elements.end = document.getElementById("end");
+  await Promise.all([...document.images].map((image) => image.decode()));
+
+  return {
+    duration: T.duration,
+    offsets: Object.fromEntries(WINDOW_SHOTS.map((shot, index) => [shot.key, offsets[index]])),
+    alignmentErrors: Object.fromEntries(WINDOW_SHOTS.map((shot, index) => [shot.key, Number(errors[index].toFixed(2))])),
+  };
+}
+
+function createHighlight(parent, rect, scale) {
+  const node = document.createElement("div");
+  node.className = "highlight";
+  Object.assign(node.style, {
+    left: `${rect.x * scale}px`, top: `${rect.y * scale}px`,
+    width: `${rect.w * scale}px`, height: `${rect.h * scale}px`,
+  });
+  parent.append(node);
+  return node;
+}
+
+// 两个镜头位置之间插值：画面中心对着的窗口坐标线性移动，缩放按对数插值，推拉速度看起来才均匀。
+function blendPlacement(from, to, amount) {
+  const centerOf = (place) => ({ x: (FRAME.width / 2 - place.x) / place.scale, y: (FRAME.height / 2 - place.y) / place.scale });
+  const fromCenter = centerOf(from), toCenter = centerOf(to);
+  const scale = from.scale * (to.scale / from.scale) ** amount;
+  return placeAt({ x: lerp(fromCenter.x, toCenter.x, amount), y: lerp(fromCenter.y, toCenter.y, amount) }, scale);
+}
+
+function cameraAt(time) {
+  let current = state.views.full;
+  for (const move of state.cameraMoves) {
+    if (time <= move.span[0]) break;
+    if (time < move.span[1]) return blendPlacement(current, move.to, progress(time, move.span));
+    current = move.to;
+  }
+  return current;
+}
+
+function cursorPosition(time) {
+  const { spots } = state;
+  if (time < T.cursorToAdd[0]) {
+    const control = { x: spots.start.x + 240, y: spots.word.y + 150 };
+    return bezier(spots.start, control, spots.word, progress(time, T.cursorToWord));
+  }
+  if (time < T.cursorRest[0]) {
+    const control = { x: spots.addButton.x + 64, y: spots.word.y + 108 };
+    return bezier(spots.word, control, spots.addButton, progress(time, T.cursorToAdd));
+  }
+  const amount = progress(time, T.cursorRest);
+  return { x: lerp(spots.addButton.x, spots.restAfterAdd.x, amount), y: lerp(spots.addButton.y, spots.restAfterAdd.y, amount) };
+}
+
+function renderWindow(time) {
+  const camera = cameraAt(time);
+  elements.camera.style.transform = `translate(${camera.x}px, ${camera.y}px) scale(${camera.scale})`;
+  elements.window.style.opacity = 1 - progress(time, T.outro);
+  elements.dim.style.opacity = DIM_OPACITY * progress(time, T.toBackground);
+
+  elements.popup.style.opacity = progress(time, T.popupIn);
+  elements.queued.style.opacity = progress(time, T.queuedIn);
+  elements.synced.style.opacity = progress(time, T.syncedIn);
+  elements.formsRow.style.opacity = visibility(time, T.formsHighlight);
+  elements.statusRow.style.opacity = visibility(time, T.statusHighlight);
+
+  const cursor = cursorPosition(time);
+  const clickTimes = T.clicks.concat(T.addClick);
+  const pressed = clickTimes.some((click) => time >= click && time < click + 0.08);
+  Object.assign(elements.cursor.style, {
+    left: `${cursor.x - CURSOR_TIP.x}px`,
+    top: `${cursor.y - CURSOR_TIP.y}px`,
+    opacity: progress(time, T.cursorFade) * (1 - progress(time, T.cursorHide)),
+    transform: pressed ? "scale(0.86)" : "none",
+  });
+
+  clickTimes.forEach((click, index) => {
+    const ripple = elements.ripples[index];
+    const amount = clamp((time - click) / 0.45);
+    const target = index < T.clicks.length ? state.spots.word : state.spots.addButton;
+    Object.assign(ripple.style, {
+      left: `${target.x}px`,
+      top: `${target.y}px`,
+      opacity: time < click ? 0 : 0.85 * (1 - amount),
+      transform: `scale(${0.25 + 0.75 * amount})`,
+    });
+  });
+}
+
+function renderPhone(time) {
+  const enter = progress(time, T.phoneIn);
+  const leave = progress(time, T.outro);
+  elements.phone.style.opacity = enter * (1 - leave);
+  elements.phone.style.transform = `translateX(${800 * (1 - enter)}px) scale(${1 - 0.04 * leave})`;
+
+  elements.after.style.opacity = progress(time, T.afterIn);
+  const slide = progress(time, T.reviewIn);
+  const listOffset = `translateX(${-PHONE_SCREEN_WIDTH * slide}px)`;
+  elements.after.style.transform = listOffset;
+  elements.before.style.transform = listOffset;
+  elements.review.style.transform = `translateX(${PHONE_SCREEN_WIDTH * (1 - slide)}px)`;
+  elements.newRow.style.opacity = visibility(time, T.newRowHighlight);
+  elements.newRow.style.transform = listOffset;
+  elements.reviewWord.style.opacity = visibility(time, T.reviewHighlight);
+}
+
+function renderCaptions(time) {
+  CAPTIONS.forEach((caption, index) => {
+    elements.captions[index].style.opacity = visibility(time, [caption.from, caption.to], 0.18);
+  });
+  const end = progress(time, T.endIn);
+  elements.end.style.opacity = end;
+  elements.end.style.transform = `translateY(${24 * (1 - end)}px)`;
+}
+
+// 上面的时间轴都是「剧情时间」。插了停顿之后，成片时间 = 剧情时间 + 之前所有停顿的长度，
+// 停顿期间画面定格在 pause.at 那一刻。
+let pauses = [];
+
+function toStoryTime(time) {
+  let shift = 0;
+  for (const pause of pauses) {
+    if (time < pause.at + shift) break;
+    if (time < pause.at + shift + pause.length) return pause.at;
+    shift += pause.length;
+  }
+  return time - shift;
+}
+
+function toVideoTime(story) {
+  return story + pauses.filter((pause) => pause.at < story).reduce((sum, pause) => sum + pause.length, 0);
+}
+
+// render.mjs 合成好每句配音后把时长传进来，返回拉长后的总时长和每句配音的起点（成片时间）。
+window.configureNarration = (durations) => {
+  pauses = CAPTIONS.map((caption, index) => ({
+    at: caption.pauseAt,
+    length: Math.max(0, durations[index] + NARRATION_LEAD + NARRATION_TAIL - (caption.to - caption.from)),
+  })).filter((pause) => pause.length > 0).sort((first, second) => first.at - second.at);
+  return {
+    duration: toVideoTime(T.duration),
+    cues: CAPTIONS.map((caption) => toVideoTime(caption.from) + NARRATION_LEAD),
+  };
+};
+
+window.renderAt = (time) => {
+  const story = toStoryTime(time);
+  renderWindow(story);
+  renderPhone(story);
+  renderCaptions(story);
+  // 等两帧，保证截图拿到的是这次改完样式之后的画面。
+  return new Promise((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve(true))));
+};
+
+window.sceneReady = setup().then((info) => {
+  window.renderAt(0);
+  return { ...info, captions: CAPTIONS.map((caption) => caption.text) };
+});
+</script>
+</body>
+</html>

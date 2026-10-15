@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>墨墨操作流程图</title>
+<!--
+  README 里两张墨墨 App 操作流程图（获取 Token、开启学习数据自动同步）的合成页面，
+  render.mjs 用无头 Chromium 打开后整页截图，用 ?guide= 参数选择出哪一张。
+  隐私内容在画布上处理后才放进页面：文字类先用底色抹掉原文、再画一段模糊的占位字，
+  所以最终图片里不含任何原始像素，没法从模糊结果里还原；日历、经验条这类非文字内容直接原位模糊。
+-->
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    width: 1832px; padding: 90px 100px;
+    background: linear-gradient(160deg, #eceef0 0%, #f6f7f8 50%, #e9ebee 100%);
+    font: 700 34px/1.2 "Kaiti SC", "STKaiti", "KaiTi", serif; color: #1f2329;
+  }
+  .row { display: flex; justify-content: center; align-items: flex-start; }
+  .row + .row { margin-top: 110px; }
+
+  .step { width: 444px; display: flex; flex-direction: column; align-items: center; }
+  .label { height: 64px; display: flex; align-items: center; gap: 14px; white-space: nowrap; letter-spacing: 1px; }
+  .badge {
+    width: 50px; height: 50px; border-radius: 50%; flex: none;
+    display: flex; align-items: center; justify-content: center;
+    background: #f5b83d; color: #fff; font: 700 30px/1 -apple-system, "Helvetica Neue", sans-serif;
+  }
+  .phone {
+    margin-top: 28px; padding: 12px; border-radius: 56px; background: #16181b;
+    box-shadow: 0 24px 60px rgba(17, 20, 24, .20), inset 0 0 0 2px #2b2e33;
+  }
+  .screen { position: relative; width: 420px; border-radius: 44px; overflow: hidden; background: #fff; }
+  .screen canvas { display: block; }
+  .tap {
+    position: absolute; border: 5px solid #f5b83d; border-radius: 14px;
+    box-shadow: 0 0 0 7px rgba(245, 184, 61, .28);
+  }
+
+  /* 两步之间的箭头。长图那一格旁边再加一个向下的「下滑」提示。 */
+  .gap { position: relative; width: 150px; align-self: stretch; }
+  .gap > svg { position: absolute; left: 30px; }
+  .scroll-hint {
+    position: absolute; left: 0; width: 150px; display: flex; flex-direction: column; align-items: center; gap: 10px;
+    color: #8a8f98; font-size: 30px;
+  }
+</style>
+</head>
+<body>
+  <div class="row" id="row-1"></div>
+  <div class="row" id="row-2"></div>
+
+<script type="module">
+import { downscale, loadImage, processShot } from "./canvas-tools.mjs";
+
+const SCREEN_WIDTH = 420;
+
+// 状态栏左上角那几个 App 通知图标，所有截图位置一样，用状态栏底色抹掉。
+const STATUS_ICONS = { type: "erase", rect: { x: 185, y: 40, w: 172, h: 68 }, sampleAt: { x: 520, y: 72 } };
+
+const pillRedact = (top) => ({
+  type: "redact", rect: { x: 880, y: top + 10, w: 208, h: 69 }, sampleAt: { x: 886, y: top + 16 },
+  lines: ["0000"], font: "34px 'PingFang SC'", color: "#fff", blur: 7,
+});
+const statRedact = (x, w, text) => ({
+  type: "redact", rect: { x, y: 566, w, h: 58 }, sampleAt: { x: 150, y: 600 },
+  lines: [text], font: "600 38px 'PingFang SC'", color: "#222", blur: 8,
+});
+
+// 坐标是截图原始像素（宽 1200）。tap 是这一步要点的位置。file 相对 attachments/Pictures/。
+// 两张流程图前三步一样：首页 → 我的 → 更多设置 → 实验功能，截图、打码和点按位置都共用。
+// 第四步的实验功能弹层也是同一张截图，只是要点的那一行不同。
+const COMMON_STEPS = [
+  {
+    file: "获取墨墨token/1-首页.jpg", label: "点右下角「我的」",
+    tap: { x: 985, y: 2486, w: 135, h: 140 },
+    masks: [
+      STATUS_ICONS,
+      // 签到日历上每天的打卡图标。
+      { type: "blur", rect: { x: 70, y: 425, w: 1060, h: 500 }, amount: 16 },
+      {
+        type: "redact", rect: { x: 432, y: 1702, w: 192, h: 60 }, sampleAt: { x: 700, y: 1730 },
+        lines: ["52816037"], font: "40px 'PingFang SC'", color: "#9a9a9a", blur: 7,
+      },
+    ],
+  },
+  {
+    file: "获取墨墨token/2-我的-长截图.jpg", label: "下滑到底，点「更多设置」", scrollHint: true,
+    tap: { x: 18, y: 2772, w: 1164, h: 154 },
+    masks: [
+      STATUS_ICONS,
+      { type: "avatar", rect: { x: 48, y: 296, w: 190, h: 194 } },
+      {
+        type: "redact", rect: { x: 278, y: 302, w: 520, h: 70 }, sampleAt: { x: 900, y: 330 },
+        lines: ["一二三四五六七八"], font: "600 50px 'PingFang SC'", color: "#222", blur: 11,
+      },
+      {
+        type: "redact", rect: { x: 282, y: 390, w: 136, h: 54 }, radius: 10, sampleAt: { x: 292, y: 417 },
+        lines: ["LVL 0"], font: "30px 'PingFang SC'", color: "#fff", blur: 8,
+      },
+      {
+        type: "redact", rect: { x: 805, y: 396, w: 305, h: 50 }, sampleAt: { x: 780, y: 420 },
+        lines: ["再签到 0 天升级"], font: "34px 'PingFang SC'", color: "#777", blur: 9,
+      },
+      { type: "blur", rect: { x: 276, y: 460, w: 882, h: 40 }, amount: 6 },
+      statRedact(180, 100, "0/00"),
+      statRedact(556, 80, "00"),
+      statRedact(896, 140, "00:00"),
+      ...[966, 1129, 1292, 1455, 1804, 1967, 2129].map(pillRedact),
+    ],
+  },
+  {
+    file: "获取墨墨token/3-更多设置.jpg", label: "点「实验功能」",
+    tap: { x: 18, y: 1752, w: 1164, h: 154 },
+    masks: [STATUS_ICONS],
+  },
+];
+
+const GUIDES = {
+  token: {
+    title: "获取墨墨 Token",
+    steps: [
+      ...COMMON_STEPS,
+      {
+        file: "获取墨墨token/4-实验功能.jpg", label: "点「开放 API」",
+        tap: { x: 58, y: 1994, w: 1084, h: 142 },
+        masks: [STATUS_ICONS],
+      },
+      {
+        file: "获取墨墨token/5-API开放.jpg", label: "点「复制」，拿到 Token",
+        tap: { x: 50, y: 815, w: 1115, h: 151 },
+        masks: [
+          STATUS_ICONS,
+          {
+            type: "redact", rect: { x: 100, y: 520, w: 1000, h: 165 }, sampleAt: { x: 300, y: 470 },
+            // 占位串是随手编的，和真实 Token 无关。
+            lines: ["3f9a0c7e1b52d846fa0e93c1b7d2504e8a6c", "d17b4e09f2c85a3e6b0d94f71c2a"],
+            font: "46px 'PingFang SC'", color: "#555", blur: 8, lineHeight: 70,
+          },
+        ],
+      },
+    ],
+  },
+  sync: {
+    title: "开启学习数据自动同步",
+    steps: [
+      ...COMMON_STEPS,
+      {
+        file: "获取墨墨token/4-实验功能.jpg", label: "点「学习数据自动同步」",
+        tap: { x: 58, y: 1802, w: 1084, h: 142 },
+        masks: [STATUS_ICONS],
+      },
+      {
+        file: "学习数据同步/5-学习数据自动同步.jpg", label: "选「启用」",
+        tap: { x: 978, y: 1922, w: 138, h: 100 },
+        masks: [STATUS_ICONS],
+      },
+    ],
+  },
+};
+
+// 用 ?guide=token 或 ?guide=sync 选择出哪一张。
+const guide = GUIDES[new URLSearchParams(location.search).get("guide") ?? "token"];
+const PICTURES = "../../attachments/Pictures/";
+const STEPS = guide.steps;
+document.title = guide.title;
+
+const ROWS = [[0, 1, 2], [3, 4]];
+
+const ARROW_SVG = `<svg width="90" height="40" viewBox="0 0 90 40" xmlns="http://www.w3.org/2000/svg">
+  <path d="M4 20 H78 M62 6 L80 20 L62 34" fill="none" stroke="#b9bec6" stroke-width="6"
+        stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+const DOWN_SVG = `<svg width="40" height="120" viewBox="0 0 40 120" xmlns="http://www.w3.org/2000/svg">
+  <path d="M20 4 V108 M6 90 L20 110 L34 90" fill="none" stroke="#b9bec6" stroke-width="6"
+        stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+
+function buildStep(step, index, canvas, scale) {
+  const node = document.createElement("div");
+  node.className = "step";
+  node.innerHTML = `<div class="label"><span class="badge">${index + 1}</span><span>${step.label}</span></div>
+    <div class="phone"><div class="screen"></div></div>`;
+  const screen = node.querySelector(".screen");
+  screen.append(canvas);
+  const tap = document.createElement("div");
+  tap.className = "tap";
+  Object.assign(tap.style, {
+    left: `${step.tap.x * scale}px`, top: `${step.tap.y * scale}px`,
+    width: `${step.tap.w * scale}px`, height: `${step.tap.h * scale}px`,
+  });
+  screen.append(tap);
+  return node;
+}
+
+function buildGap(withScrollHint) {
+  const node = document.createElement("div");
+  node.className = "gap";
+  // 箭头固定在手机上部，整行高度一致。
+  node.innerHTML = ARROW_SVG;
+  node.querySelector("svg").style.top = "400px";
+  if (withScrollHint) {
+    const hint = document.createElement("div");
+    hint.className = "scroll-hint";
+    hint.style.top = "1120px";
+    hint.innerHTML = `<span>下滑</span>${DOWN_SVG}`;
+    node.append(hint);
+  }
+  return node;
+}
+
+async function setup() {
+  const images = await Promise.all(STEPS.map((step) => loadImage(PICTURES + step.file)));
+  const scale = SCREEN_WIDTH / images[0].naturalWidth;
+  const canvases = STEPS.map((step, index) => downscale(processShot(images[index], step.masks), SCREEN_WIDTH));
+
+  ROWS.forEach((indexes, rowIndex) => {
+    const row = document.getElementById(`row-${rowIndex + 1}`);
+    indexes.forEach((stepIndex, position) => {
+      if (position > 0) row.append(buildGap(STEPS[indexes[position - 1]].scrollHint));
+      row.append(buildStep(STEPS[stepIndex], stepIndex, canvases[stepIndex], scale));
+    });
+  });
+
+  await document.fonts.ready;
+  return { width: document.body.scrollWidth, height: document.body.scrollHeight };
+}
+
+window.sceneReady = setup();
+</script>
+</body>
+</html>

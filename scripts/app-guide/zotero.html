@@ -1,0 +1,150 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>Zotero 设置流程图</title>
+<!--
+  README「二、Zotero 设置」那张图的合成页面，编号和 README 这一节的第 1–3 步对应。
+  按 800 CSS 像素宽排版，render.mjs 用 2 倍像素密度截图，README 里按 800 宽显示正好一比一。
+  这几张截图本身是 1 倍分辨率，只能按原尺寸附近用，所以只裁出要点的那一块。
+-->
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    width: 800px; padding: 36px 32px 40px;
+    background: linear-gradient(160deg, #eceef0 0%, #f6f7f8 50%, #e9ebee 100%);
+    font: 700 20px/1.3 "Kaiti SC", "STKaiti", "KaiTi", serif; color: #1f2329;
+  }
+  section + section { margin-top: 36px; }
+  .label { display: flex; align-items: center; gap: 10px; letter-spacing: .5px; }
+  .label + .label { margin-top: 8px; }
+  .badge {
+    width: 28px; height: 28px; border-radius: 50%; flex: none;
+    display: flex; align-items: center; justify-content: center;
+    background: #f5b83d; color: #fff; font: 700 17px/1 -apple-system, "Helvetica Neue", sans-serif;
+  }
+  .shots { margin-top: 16px; display: flex; align-items: flex-start; justify-content: space-between; }
+  .shot { display: flex; flex-direction: column; align-items: center; gap: 10px; }
+  .card {
+    position: relative; border-radius: 10px; background: #fff;
+    box-shadow: 0 10px 28px rgba(17, 20, 24, .16), 0 0 0 1px rgba(17, 20, 24, .06);
+  }
+  /* 卡片不裁切，免得贴边的圈和编号被切掉；圆角只加在截图上。 */
+  .card canvas { display: block; border-radius: 10px; }
+  .caption { font-size: 16px; font-weight: 400; color: #4b5059; white-space: nowrap; }
+  .arrow { align-self: center; margin-top: -26px; }
+
+  .tap {
+    position: absolute; border: 3px solid #f5b83d; border-radius: 8px;
+    box-shadow: 0 0 0 4px rgba(245, 184, 61, .28);
+  }
+  .tap .badge { position: absolute; left: -15px; top: -15px; width: 24px; height: 24px; font-size: 14px; }
+</style>
+</head>
+<body>
+  <section>
+    <div class="label"><span class="badge">1</span><span>安装插件</span></div>
+    <div class="shots" id="install"></div>
+  </section>
+  <section>
+    <div class="label"><span class="badge">2</span><span>在设置里打开「墨墨单词同步」，粘贴 Token，点「测试连接」</span></div>
+    <div class="label"><span class="badge">3</span><span>选中词本，点「使用所选词本」</span></div>
+    <div class="shots" id="settings"></div>
+  </section>
+
+<script type="module">
+import { loadImage, processShot } from "./canvas-tools.mjs";
+
+const PICTURES = "../../attachments/Pictures/Zotero设置/";
+const CONTENT_WIDTH = 736;
+const ARROW_WIDTH = 44;
+
+// 坐标是截图原始像素。crop 是裁出来展示的那块，taps 是要点的位置，step 是圈旁边标的步骤号。
+const INSTALL_SHOTS = [
+  {
+    file: "工具-插件.png", caption: "菜单栏「工具 → 插件」",
+    crop: { x: 0, y: 0, w: 430, h: 195 },
+    taps: [{ x: 241, y: 3, w: 58, h: 26 }, { x: 244, y: 93, w: 159, h: 28 }],
+  },
+  {
+    file: "插件管理页面.png", caption: "齿轮 →「Install Plugin From File…」",
+    crop: { x: 660, y: 44, w: 330, h: 215 },
+    taps: [{ x: 937, y: 55, w: 38, h: 38 }, { x: 679, y: 156, w: 295, h: 30 }],
+  },
+];
+const SETTINGS_SHOT = {
+  file: "Zotero设置页面.png",
+  crop: { x: 0, y: 0, w: 800, h: 452 },
+  taps: [
+    { x: 4, y: 301, w: 185, h: 57, step: 2 },
+    { x: 216, y: 177, w: 565, h: 36, step: 2 },
+    { x: 211, y: 400, w: 571, h: 40, step: 3 },
+  ],
+  masks: [
+    {
+      // 输入框里的 Token 是明文，抹掉后画一段模糊的占位串，和真实 Token 无关。
+      type: "redact", rect: { x: 226, y: 184, w: 426, h: 22 }, background: "#fff",
+      lines: ["3f9a0c7e1b52d846fa0e93c1b7d2504e8a6cd17b4e09f2c85a3e6b"],
+      font: "13px -apple-system, 'Helvetica Neue', sans-serif", color: "#222", blur: 3, radius: 2,
+    },
+  ],
+};
+
+const ARROW_SVG = `<svg class="arrow" width="${ARROW_WIDTH}" height="24" viewBox="0 0 44 24" xmlns="http://www.w3.org/2000/svg">
+  <path d="M4 12 H36 M28 4 L38 12 L28 20" fill="none" stroke="#b9bec6" stroke-width="4"
+        stroke-linecap="round" stroke-linejoin="round"/></svg>`;
+
+// 裁出要展示的那块，放进带圆角阴影的卡片，再按 scale 缩放并标上点按位置。
+function buildCard(shot, image, scale) {
+  const processed = processShot(image, shot.masks ?? []);
+  const { crop } = shot;
+  const canvas = document.createElement("canvas");
+  canvas.width = crop.w;
+  canvas.height = crop.h;
+  canvas.getContext("2d").drawImage(processed, -crop.x, -crop.y);
+  canvas.style.width = `${crop.w * scale}px`;
+  canvas.style.height = `${crop.h * scale}px`;
+
+  const card = document.createElement("div");
+  card.className = "card";
+  card.append(canvas);
+  for (const tap of shot.taps) {
+    const ring = document.createElement("div");
+    ring.className = "tap";
+    Object.assign(ring.style, {
+      left: `${(tap.x - crop.x) * scale}px`, top: `${(tap.y - crop.y) * scale}px`,
+      width: `${tap.w * scale}px`, height: `${tap.h * scale}px`,
+    });
+    if (tap.step) ring.innerHTML = `<span class="badge">${tap.step}</span>`;
+    card.append(ring);
+  }
+  return card;
+}
+
+async function setup() {
+  const installImages = await Promise.all(INSTALL_SHOTS.map((shot) => loadImage(PICTURES + shot.file)));
+  const settingsImage = await loadImage(PICTURES + SETTINGS_SHOT.file);
+
+  // 两张安装截图并排，按同一比例缩放，正好占满内容宽度。
+  const installScale = (CONTENT_WIDTH - ARROW_WIDTH - 16) / INSTALL_SHOTS.reduce((sum, shot) => sum + shot.crop.w, 0);
+  const install = document.getElementById("install");
+  INSTALL_SHOTS.forEach((shot, index) => {
+    if (index > 0) install.insertAdjacentHTML("beforeend", ARROW_SVG);
+    const column = document.createElement("div");
+    column.className = "shot";
+    column.append(buildCard(shot, installImages[index], installScale));
+    column.insertAdjacentHTML("beforeend", `<span class="caption">${shot.caption}</span>`);
+    install.append(column);
+  });
+
+  const settingsScale = CONTENT_WIDTH / SETTINGS_SHOT.crop.w;
+  document.getElementById("settings").append(buildCard(SETTINGS_SHOT, settingsImage, settingsScale));
+
+  await document.fonts.ready;
+  return { width: document.body.scrollWidth, height: document.body.scrollHeight };
+}
+
+window.sceneReady = setup();
+</script>
+</body>
+</html>
