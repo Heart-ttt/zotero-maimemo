@@ -11,4 +11,3 @@ out/
 
 # README 媒体的原始截图（含明文 Token 等隐私）和本地成品，只在本机保留
 attachments/
-# 验证 main 分支保护用的测试行，随后撤回
