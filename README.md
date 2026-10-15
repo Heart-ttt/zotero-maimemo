@@ -38,9 +38,8 @@
 
 <p align="center">半分钟看完从划词到单词出现在手机上的全过程</p>
 
-<!-- TODO：把 attachments/演示视频.mp4 拖进 GitHub 网页编辑器，用生成的 user-attachments 链接替换下面的「视频地址」。 -->
 <p align="center">
-  <video src="视频地址" controls playsinline width="800"></video>
+  <video src="https://github.com/user-attachments/assets/2ca14502-157b-46f4-82f2-20a9e2d03974" controls playsinline width="800"></video>
 </p>
 
 ## 主要功能
