@@ -36,7 +36,7 @@
 
 ## 界面预览
 
-<p align="center">半分钟看完从划词到单词出现在手机上的全过程</p>
+<p align="center">三十五秒看完从划词到单词出现在手机上的全过程</p>
 
 https://github.com/user-attachments/assets/2ca14502-157b-46f4-82f2-20a9e2d03974
 
